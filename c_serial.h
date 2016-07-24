@@ -44,12 +44,16 @@ typedef int c_serial_errnum_t;
  */
 /** Everything OK */
 #define CSERIAL_OK 0
-/** invalid c_serial_port_t */
-#define CSERIAL_INVALID_PORT -1
+/** invalid c_serial_port_t, e.g. it is NULL */
+#define CSERIAL_ERROR_INVALID_PORT -1
 /** The port we tried to open is not actually a serial port */
-#define CSERIAL_NOT_A_SERIAL_PORT -2
+#define CSERIAL_ERROR_NOT_A_SERIAL_PORT -2
 /** The port that we tried to open does not exist */
-#define CSERIAL_NO_SUCH_SERIAL_PORT -3
+#define CSERIAL_ERROR_NO_SUCH_SERIAL_PORT -3
+/** The parameters to cserial_read were incorrect */
+#define CSERIAL_ERROR_INCORRECT_READ_PARAMS -4
+/** Unable to create new serial port */
+#define CSERIAL_ERROR_CANT_CREATE -5
 
 /**
  * Serial line flags
@@ -157,6 +161,16 @@ enum CSerial_Flow_Control{
  * Opaque type for interfacing with a serial port.
  */
 typedef struct c_serial_port_t c_serial_port_t;
+
+/**
+ * Logging function pointer type
+ */
+typedef void (*c_serial_log_function)( enum CSerial_Log_Level logLevel,
+                                       const char* logMessage,
+                                       const char* fileName,
+                                       int lineNumber,
+                                       const char* functionName,
+                                       c_serial_port_t* port );
 
 /**
  * Cerate a new C Serial object with default settings.
@@ -279,12 +293,26 @@ CSERIAL_EXPORT int c_serial_write_data( c_serial_port_t* port,
 /**
  * Read data from the serial port.
  * Acts like read() in POSIX systems, except that it will also return the 
- * state of the serial lines if they change, as set by 
+ * state of the serial lines.  This function will block for data before it 
+ * returns.  If a mask of serial lines to listen to has been set using
+ * c_serial_set_serial_line_change_flags, then this function may return
+ * without having read any data into the data buffer.
+ *
+ * If data is NULL and lines is non-NULL, but no change_flags have been set,
+ * this function returns immediately without having read any data.
  * 
+ * @param port The port to read data from
+ * @param data The buffer to write data to.  May be NULL if you are only
+ *  interested in listening for serial line changes.
+ * @param data_length On entry, how long the data is.  On exit, how many bytes
+ *  were read. 
+ * @param lines The state of the serial lines on read of data.
+ * @return CSERIAL_OK on success, error code otherwise
  */
 CSERIAL_EXPORT int c_serial_read_data( c_serial_port_t* port,
                                        void* data,
-                                       int data_length );
+                                       int* data_length,
+                                       c_serial_control_lines_t* lines );
 
 /**
  * Get the native handle(int or HANDLE) that is used by this serial port.
@@ -344,6 +372,46 @@ CSERIAL_EXPORT void* c_serial_get_user_data( c_serial_port_t* port );
  * Get the text of a C Serial error number
  */
 CSERIAL_EXPORT const char* c_serial_get_error_string( int errnum );
+
+/**
+ * Set the log function for a specific serial port
+ */
+CSERIAL_EXPORT int c_serial_set_log_function( c_serial_port_t* port,
+                                              c_serial_log_function func );
+
+/**
+ * Set the global log function.  This function is used if the log function
+ * for a specified port has not been set.
+ */
+CSERIAL_EXPORT int c_serial_set_global_log_function( 
+                                                 c_serial_log_function func );
+
+/**
+ * A simple implementation of a log function which outputs log information
+ * to stderr.
+ */
+CSERIAL_EXPORT void c_serial_stderr_log_function( 
+                                       enum CSerial_Log_Level logLevel,
+                                       const char* logMessage,
+                                       const char* fileName,
+                                       int lineNumber,
+                                       const char* functionName,
+                                       c_serial_port_t* port );
+
+/**
+ * Get a list of all serial ports that are on the system.
+ * This must be freed with c_serial_free_serial_ports_list()
+ *
+ * @return An array of char* listing all of the serial ports on the system
+ *  e.g. /dev/ttyS1, /dev/ttyS2 on Linux; COM1,COM2 on Windows.  This array is 
+ *  NULL-terminated.
+ */
+CSERIAL_EXPORT const char** c_serial_get_serial_ports_list();
+
+/**
+ * Free the list of serial ports retrieved with c_serial_get_serial_ports
+ */
+CSERIAL_EXPORT void c_serial_free_serial_ports_list();
                     
 #ifdef __cplusplus
 } /* end extern "C" */

@@ -11,7 +11,7 @@
 #   distributed under the License is distributed on an "AS IS" BASIS,
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
-PROJECT(C_Serial)
+PROJECT(cserial)
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
@@ -39,8 +39,7 @@ ADD_DEFINITIONS( "-DCSERIAL_VERSION=${CSERIAL_VERSION_STRING}" )
 SET( C_SERIAL_SOURCES
 	c_serial.c )
 SET( C_SERIAL_HEADERS 
-	c_serial.h
-	cserialconfig.h )
+	c_serial.h )
 SET( C_SERIAL_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR} )
 INCLUDE_DIRECTORIES( ${C_SERIAL_INCLUDE_DIRECTORIES} )
 
@@ -53,11 +52,37 @@ set_target_properties(cserial PROPERTIES VERSION ${CSERIAL_VERSION_STRING} SOVER
 #
 # Install Information
 #
+SET(install_targets ${install_targets} cserial )
 INSTALL( TARGETS ${install_targets}
 	RUNTIME DESTINATION bin
 	LIBRARY DESTINATION lib
 	ARCHIVE DESTINATION lib )
-INSTALL( FILES ${C_SERIAL_HEADERS} DESTINATION include )
+INSTALL( FILES ${C_SERIAL_HEADERS} DESTINATION include/cserial )
+
+IF( UNIX )
+    #
+    # pkg-config information
+    #
+    SET(PKG_CONFIG_LIBDIR
+        "\${prefix}/lib"
+    )
+    SET(PKG_CONFIG_INCLUDEDIR
+        "\${prefix}/include"
+    )
+    SET(PKG_CONFIG_LIBS
+        "-L\${libdir} -lcserial"
+    )
+    SET(PKG_CONFIG_CFLAGS
+        "-I\${includedir}"
+    )
+
+    CONFIGURE_FILE(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cserial.pc.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc"
+    )
+    INSTALL( FILES "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.pc"
+             DESTINATION lib/pkgconfig)
+ENDIF( UNIX )
 
 #
 # platform-specific defines
@@ -65,8 +90,3 @@ INSTALL( FILES ${C_SERIAL_HEADERS} DESTINATION include )
 IF( WIN32 )
 	ADD_DEFINITIONS( "-DCSERIAL_LIB" )
 ENDIF( WIN32 )
-
-#
-# Set our target compile definitions as the last thing
-#
-MESSAGE(STATUS ${PLATFORM_DEFINES} )
