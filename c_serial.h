@@ -54,6 +54,12 @@ typedef int c_serial_errnum_t;
 #define CSERIAL_ERROR_INCORRECT_READ_PARAMS -4
 /** Unable to create new serial port */
 #define CSERIAL_ERROR_CANT_CREATE -5
+/** No port defined to open */
+#define CSERIAL_ERROR_NO_PORT -6
+/** Port already open */
+#define CSERIAL_ERROR_ALREADY_OPEN -7
+/** Generic error */
+#define CSERIAL_ERROR_GENERIC -8
 
 /**
  * Serial line flags
@@ -160,7 +166,7 @@ enum CSerial_Flow_Control{
 /*
  * Opaque type for interfacing with a serial port.
  */
-typedef struct c_serial_port_t c_serial_port_t;
+typedef struct c_serial_port c_serial_port_t;
 
 /**
  * Logging function pointer type
@@ -175,9 +181,15 @@ typedef void (*c_serial_log_function)( enum CSerial_Log_Level logLevel,
 /**
  * Cerate a new C Serial object with default settings.
  * 
- * @return CSERIAL_OK or an error code
+ * @param port A pointer to the pointer that will be filled in with the 
+ *  new data.
+ * @param errnum A pointer to the native error type if extended error
+ *  information is required
+ * @return CSERIAL_OK or an error code.  If there was an error, the port will
+ *  not be valid.
  */
-CSERIAL_EXPORT int c_serial_new( c_serial_port_t** port );
+CSERIAL_EXPORT int c_serial_new( c_serial_port_t** port,
+                                 c_serial_errnum_t* errnum );
 
 /**
  * Close the serial port(if it is not already closed) and free all resources.
@@ -397,6 +409,13 @@ CSERIAL_EXPORT void c_serial_stderr_log_function(
                                        int lineNumber,
                                        const char* functionName,
                                        c_serial_port_t* port );
+
+/**
+ * Get the last error number associated with this port.  This corresponds
+ * to errno on Linux-like systems, and GetLastError() on Windows.
+ */
+CSERIAL_EXPORT c_serial_errnum_t c_serial_get_last_native_errnum( 
+                                                       c_serial_port_t* port );
 
 /**
  * Get a list of all serial ports that are on the system.
