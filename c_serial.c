@@ -22,7 +22,7 @@
 
     #define close( x ) CloseHandle( x )
     #define SPEED_SWITCH(SPD,io) case SPD: io.BaudRate = CBR_##SPD; break;
-    #define GET_SPEED_SWITCH(SPD,io) case CBR_##SPD: return SPD;
+    #define GET_SPEED_SWITCH(SPD,io) case CBR_##SPD: baud_return = SPD;
 	
     #define GET_SERIAL_PORT_STRUCT( port, io_name ) DCB io_name = {0};\
        io_name.DCBlength = sizeof( io_name ); \
@@ -59,7 +59,7 @@ typedef HANDLE c_serial_mutex_t;
     #endif
 	
     #define SPEED_SWITCH(SPD,io) case SPD: cfsetospeed( &io, B##SPD ); cfsetispeed( &io, B##SPD ); break;
-    #define GET_SPEED_SWITCH(SPD,io) case B##SPD: return SPD;
+    #define GET_SPEED_SWITCH(SPD,io) case B##SPD: baud_return = SPD;
     #define GET_SERIAL_PORT_STRUCT( port, io_name )	struct termios io_name; \
         if( tcgetattr( port, &io_name ) < 0 ){ \
             return -1; \
@@ -427,6 +427,10 @@ void c_serial_close( c_serial_port_t* port ){
 }
 
 int c_serial_open( c_serial_port_t* port ){
+    return c_serial_open_keep_settings( port, 0 );
+}
+
+int c_serial_open_keep_settings( c_serial_port_t* port, int keepSettings ){
     CHECK_INVALID_PORT( port );
 
     if( port->is_open ) return CSERIAL_ERROR_ALREADY_OPEN;
@@ -470,12 +474,14 @@ int c_serial_open( c_serial_port_t* port ){
 
     port->is_open = 1;
 
-    set_raw_input( port );
-    set_baud_rate( port, port->baud_rate );
-    set_data_bits( port, port->data_bits );
-    set_stop_bits( port, port->stop_bits );
-    set_parity( port, port->parity );
-    set_flow_control( port, port->flow );
+    if( !keepSettings ){
+        set_raw_input( port );
+        set_baud_rate( port, port->baud_rate );
+        set_data_bits( port, port->data_bits );
+        set_stop_bits( port, port->stop_bits );
+        set_parity( port, port->parity );
+        set_flow_control( port, port->flow );
+    }
 
     return CSERIAL_OK;
 }
@@ -534,43 +540,185 @@ int c_serial_set_baud_rate( c_serial_port_t* port,
 }
 
 enum CSerial_Baud_Rate c_serial_get_baud_rate( c_serial_port_t* port ){
+    enum CSerial_Baud_Rate baud_return;
+
     CHECK_INVALID_PORT( port );
 
     if( !port->is_open ){
         return port->baud_rate;
     }
+
+    {
+        GET_SERIAL_PORT_STRUCT( port->port, newio );
+#ifdef _WIN32
+        GetCommState( port->port, &newio );
+        switch( newio.BaudRate ){
+#else
+        switch( cfgetispeed( &newio ) ){
+        GET_SPEED_SWITCH( 0, newio );
+        GET_SPEED_SWITCH( 50, newio );
+        GET_SPEED_SWITCH( 75, newio );
+#endif /* _WIN32 */
+        GET_SPEED_SWITCH( 110, newio );
+#ifndef _WIN32
+        GET_SPEED_SWITCH( 134, newio );
+        GET_SPEED_SWITCH( 150, newio );
+        GET_SPEED_SWITCH( 200, newio );
+#endif /* _WIN32 */
+        GET_SPEED_SWITCH( 300, newio );
+        GET_SPEED_SWITCH( 600, newio );
+        GET_SPEED_SWITCH( 1200, newio );
+#ifndef _WIN32
+        GET_SPEED_SWITCH( 1800, newio );
+#endif /* _WIN32 */
+        GET_SPEED_SWITCH( 2400, newio );
+        GET_SPEED_SWITCH( 4800, newio );
+        GET_SPEED_SWITCH( 9600, newio );
+        GET_SPEED_SWITCH( 19200, newio );
+        GET_SPEED_SWITCH( 38400, newio );
+        GET_SPEED_SWITCH( 115200, newio );
+        default:
+            baud_return = 0;
+        } /* end switch */
+    }
+
+    port->baud_rate = baud_return;
+    return port->baud_rate;
 }
 
 int c_serial_set_data_bits( c_serial_port_t* port,
                             enum CSerial_Data_Bits bits ){
     CHECK_INVALID_PORT( port );
+
+    port->data_bits = bits;
+    if( port->is_open ){
+        set_data_bits( port, port->data_bits );
+    }
+
+    return CSERIAL_OK;
 }
 
 enum CSerial_Data_Bits c_serial_get_data_bits( c_serial_port_t* port ){
     CHECK_INVALID_PORT( port );
+
+    {
+        GET_SERIAL_PORT_STRUCT( port->port, newio );
+		
+#ifdef _WIN32
+        switch( newio.ByteSize ){
+            case 5: return CSERIAL_BITS_5;
+            case 6: return CSERIAL_BITS_6;
+            case 7: return CSERIAL_BITS_7;
+            case 8: return CSERIAL_BITS_8;
+        }
+#else
+        if( ( newio.c_cflag | CS8 ) == CS8 ){
+            return CSERIAL_BITS_8;
+        }else if( ( newio.c_cflag | CS7 ) == CS7 ){
+            return CSERIAL_BITS_7;
+        }else if( ( newio.c_cflag | CS6 ) == CS6 ){
+            return CSERIAL_BITS_6;
+        }else if( ( newio.c_cflag | CS5 ) == CS5 ){
+            return CSERIAL_BITS_5;
+        }else{
+            return 0;
+        }
+#endif
+    }
 }
 
 int c_serial_set_stop_bits( c_serial_port_t* port,
                             enum CSerial_Stop_Bits bits ){
     CHECK_INVALID_PORT( port );
+
+    port->stop_bits = bits;
+    if( port->is_open ){
+        set_stop_bits( port, port->stop_bits );
+    }
+ 
+    return CSERIAL_OK;
 }
 
 enum CSerial_Stop_Bits c_serial_get_stop_btis( c_serial_port_t* port ){
     CHECK_INVALID_PORT( port );
+
+    {
+        GET_SERIAL_PORT_STRUCT( port->port, newio );
+#ifdef _WIN32
+        port->stop_bits = newio.StopBits;
+        if( newio.StopBits == 1 ){
+            return 1;
+        }else if( newio.StopBits == 2 ){
+            return 2;
+        }else{
+            return -1;
+        }
+#else
+        if( newio.c_cflag & CSTOPB ){
+            port->stop_bits = 2;
+            return 2;
+        }else{
+            port->stop_bits = 1;
+            return 1;
+        }
+#endif
+    }
 }
 
 int c_serial_set_parity( c_serial_port_t* port,
                          enum CSerial_Parity parity ){
     CHECK_INVALID_PORT( port );
+
+    port->parity = parity;
+    if( port->is_open ){
+        set_parity( port, port->parity );
+    }
+    
+    return CSERIAL_OK;
 }
 
 enum CSerial_Parity c_serial_get_parity( c_serial_port_t* port ){
     CHECK_INVALID_PORT( port );
+
+    {
+        GET_SERIAL_PORT_STRUCT( port->port, newio );
+#ifdef _WIN32
+        if( newio.Parity == NOPARITY ){
+            return 0;
+        }else if( newio.Parity == ODDPARITY ){
+            return 1;
+        }else if( newio.Parity == EVENPARITY ){
+            return 2;
+        }else{
+            return -1;
+        }
+#else
+        if( !( newio.c_cflag & PARENB ) ){
+            /* No parity */
+            return 0;
+        }else if( newio.c_cflag & PARODD ){
+            /* Odd parity */
+            return 1;
+        }else if( !( newio.c_cflag & PARODD ) ){
+           /* Even parity */
+           return 2;
+        }else{
+           return -1;
+        }
+#endif
+    }
 }
 
 int c_serial_set_flow_control( c_serial_port_t* port,
                                enum CSerial_Flow_Control contol ){
     CHECK_INVALID_PORT( port );
+   
+    port->flow_control = control;
+    if( port->is_open ){
+        set_flow_control( port, port->flow_nctrol );
+    }
+
+    return CSERIAL_OK;
 }
 
 enum CSerial_Flow_Control c_serial_get_flow_control( c_serial_port_t* port ){

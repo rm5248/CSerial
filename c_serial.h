@@ -140,25 +140,25 @@ enum CSerial_Baud_Rate {
 }; 
 
 enum CSerial_Data_Bits{
-    CSERIAL_BITS_5,
+    CSERIAL_BITS_5 = 5,
     CSERIAL_BITS_6,
     CSERIAL_BITS_7,
     CSERIAL_BITS_8
 };
 
 enum CSerial_Stop_Bits{
-    CSERIAL_STOP_BITS_1,
+    CSERIAL_STOP_BITS_1 = 1,
     CSERIAL_STOP_BITS_2
 };
 
 enum CSerial_Parity{
-    CSERIAL_PARITY_NONE,
+    CSERIAL_PARITY_NONE = 0,
     CSERIAL_PARITY_ODD,
     CSERIAL_PARITY_EVEN
 };
 
 enum CSerial_Flow_Control{
-    CSERIAL_FLOW_NONE,
+    CSERIAL_FLOW_NONE = 0,
     CSERIAL_FLOW_HARDWARE,
     CSERIAL_FLOW_SOFTWARE
 };
@@ -209,6 +209,16 @@ CSERIAL_EXPORT void c_serial_close( c_serial_port_t* port );
 CSERIAL_EXPORT int c_serial_open( c_serial_port_t* port );
 
 /**
+ * Open the port on the system, optionally keeping all settings.
+ * 
+ * @param port The port to open
+ * @param keepSettings 1 if current serial port settings should be kept,
+ *  0 otherwise
+ */
+CSERIAL_EXPORT int c_serial_open_keep_settings( c_serial_port_t* port,
+                                                int keepSettings );
+
+/**
  * Returns 1 if the port is open, 0 otherwise
  */
 CSERIAL_EXPORT int c_serial_is_open( c_serial_port_t* port );
@@ -236,7 +246,9 @@ CSERIAL_EXPORT int c_serial_set_baud_rate( c_serial_port_t* port,
                                            enum CSerial_Baud_Rate baud );
 
 /**
- * Get the baud rate of the serial port
+ * Get the baud rate of the serial port.  Note that this function returns 
+ * a cached value if the port is not open, otherwise it reads directly
+ * from the port and returns the proper value.
  */
 CSERIAL_EXPORT enum CSerial_Baud_Rate c_serial_get_baud_rate( 
                                                c_serial_port_t* port );
