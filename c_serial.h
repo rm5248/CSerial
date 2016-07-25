@@ -44,8 +44,8 @@ typedef int c_serial_errnum_t;
  */
 /** Everything OK */
 #define CSERIAL_OK 0
-/** invalid c_serial_port_t, e.g. it is NULL */
-#define CSERIAL_ERROR_INVALID_PORT -1
+/** Generic error */
+#define CSERIAL_ERROR_GENERIC -1
 /** The port we tried to open is not actually a serial port */
 #define CSERIAL_ERROR_NOT_A_SERIAL_PORT -2
 /** The port that we tried to open does not exist */
@@ -58,8 +58,8 @@ typedef int c_serial_errnum_t;
 #define CSERIAL_ERROR_NO_PORT -6
 /** Port already open */
 #define CSERIAL_ERROR_ALREADY_OPEN -7
-/** Generic error */
-#define CSERIAL_ERROR_GENERIC -8
+/** invalid c_serial_port_t, e.g. it is NULL */
+#define CSERIAL_ERROR_INVALID_PORT -8
 
 /**
  * Serial line flags
@@ -80,6 +80,8 @@ typedef int c_serial_errnum_t;
  * Struct representing the control line state.
  */
 struct c_serial_control_lines {
+    /** CD - Carrier Detect */
+    int cd;
     /** CTS - Clear To Send */
     int cts;
     /** DSR - Data Set Ready */
@@ -307,12 +309,12 @@ CSERIAL_EXPORT enum CSerial_Flow_Control c_serial_get_flow_control(
  *
  * @param port The port to write data out to.
  * @param data The data to write out to the port.
- * @param length How long(in bytes) the data is.
- * @return The number of bytes written, or -1 if there is an error
+ * @param length How long(in bytes) the data is.  Set to the number of bytes written on return.
+ * @return status code
  */
 CSERIAL_EXPORT int c_serial_write_data( c_serial_port_t* port,
                                         void* data,
-                                        int length );
+                                        int* length );
 
 /**
  * Read data from the serial port.
@@ -442,7 +444,7 @@ CSERIAL_EXPORT const char** c_serial_get_serial_ports_list();
 /**
  * Free the list of serial ports retrieved with c_serial_get_serial_ports
  */
-CSERIAL_EXPORT void c_serial_free_serial_ports_list();
+CSERIAL_EXPORT void c_serial_free_serial_ports_list( const char** port_list );
                     
 #ifdef __cplusplus
 } /* end extern "C" */
