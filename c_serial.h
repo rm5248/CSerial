@@ -348,10 +348,17 @@ CSERIAL_EXPORT c_serial_handle_t c_serial_get_native_handle(
                                                  c_serial_port_t* port );
 
 /**
- * Set the state of the control lines.
+ * Set the state of the control lines, optionally returning the current 
+ * state of the lines after setting them.
+ * 
+ * @param port The port to set the line state for.
+ * @param lines The line state to set.  Note that only DTR and RTS can be set.
+ * @param return_state If true, modify lines on return with the current state
+ *  of the serial lines.
  */
 CSERIAL_EXPORT int c_serial_set_control_line( c_serial_port_t* port,
-                                              c_serial_control_lines_t* lines );
+                                              c_serial_control_lines_t* lines,
+                                              int return_state );
 
 /**
  * Get the current state of the serial lines

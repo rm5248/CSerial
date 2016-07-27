@@ -946,30 +946,209 @@ int c_serial_read_data( c_serial_port_t* port,
 
 c_serial_handle_t c_serial_get_native_handle( c_serial_port_t* port ) {
     CHECK_INVALID_PORT( port );
+    return port->port;
 }
 
 int c_serial_set_control_line( c_serial_port_t* port,
-                               c_serial_control_lines_t* lines ) {
+                               c_serial_control_lines_t* lines,
+                               int return_state ) {
+    int toSet = 0;
+
     CHECK_INVALID_PORT( port );
+    if( lines == NULL ) {
+        return CSERIAL_ERROR_GENERIC;
+    }
+
+#ifdef _WIN32
+    if( lines->dtr ) {
+        if( !EscapeCommFunction( port->port, SETDTR ) ) {
+            port->last_errnum = GetLastError();
+            LOG_ERROR( "Unable to get serial line state", port );
+            return CSERIAL_ERROR_GENERIC;
+        }
+        port->winDTR = 1;
+    } else {
+        if( !EscapeCommFunction( port->port, CLRDTR ) ) {
+            port->last_errnum = GetLastError();
+            LOG_ERROR( "Unable to get serial line state", port );
+            return CSERIAL_ERROR_GENERIC;
+        }
+        port->winDTR = 0;
+    }
+
+    if( lines->rts ) {
+        if( !EscapeCommFunction( port->port, SETRTS ) ) {
+            port->last_errnum = GetLastError();
+            LOG_ERROR( "Unable to get serial line state", port );
+            return CSERIAL_ERROR_GENERIC;
+        }
+        port->winRTS = 1;
+    } else {
+        if( !EscapeCommFunction( port->port, CLRRTS ) ) {
+            port->last_errnum = GetLastError();
+            LOG_ERROR( "Unable to get serial line state", port );
+            return CSERIAL_ERROR_GENERIC;
+        }
+        port->winRTS = 0;
+    }
+#else
+
+    if( ioctl( port->port, TIOCMGET, &toSet ) < 0 ) {
+        port->last_errnum = errno;
+        LOG_ERROR( "IOCTL failed when attempting to read control lines",
+                   port );
+        return CSERIAL_ERROR_GENERIC;
+    }
+
+    if( lines->dtr ) {
+        toSet |= TIOCM_DTR;
+    } else {
+        toSet &= ~TIOCM_DTR;
+    }
+
+    if( lines->rts ) {
+        toSet |= TIOCM_RTS;
+    } else {
+        toSet &= ~TIOCM_RTS;
+    }
+
+    if( ioctl( port->port, TIOCMSET, &toSet ) < 0 ) {
+        port->last_errnum = errno;
+        LOG_ERROR( "IOCTL failed when attempting to set control lines",
+                   port );
+        return CSERIAL_ERROR_GENERIC;
+    }
+#endif
+
+    if( return_state ) {
+        return c_serial_get_control_lines( port, lines );
+    }
+
+    return CSERIAL_OK;
 }
 
 int c_serial_get_control_lines( c_serial_port_t* port,
                                 c_serial_control_lines_t* lines ) {
     CHECK_INVALID_PORT( port );
+
+    if( lines == NULL ) {
+        return CSERIAL_ERROR_GENERIC;
+    }
+
+    memset( lines, 0, sizeof( c_serial_control_lines_t ) );
+    {
+#ifdef _WIN32
+        DWORD get_val;
+        if( GetCommModemStatus( port->port, &get_val ) == 0 ) {
+            port->last_errnum = GetLastError();
+            LOG_ERROR( "Unable to get serial line state", port );
+            return CSERIAL_ERROR_GENERIC;
+        }
+
+        if( get_val & MS_CTS_ON ) {
+            // CTS
+            lines->cts = 1;
+        }
+
+        if( get_val & MS_DSR_ON ) {
+            // Data Set Ready
+            lines->dsr = 1;
+        }
+
+        if( port->winDTR ) {
+            lines->dtr = 1;
+        }
+
+        if( port->winRTS ) {
+            lines->rts = 1;
+        }
+
+        if( get_val & MS_RING_ON ) {
+            // Ring Indicator
+            lines->ri = 1;
+        }
+#else
+        int get_val;
+        if( ioctl( port->port, TIOCMGET, &get_val ) < 0 ) {
+            port->last_errnum = errno;
+            LOG_ERROR( "IOCTL failed when attempting to read control lines",
+                       port );
+            return CSERIAL_ERROR_GENERIC;
+        }
+
+        if( get_val & TIOCM_CD ) {
+            // Carrier detect
+            lines->cd = 1;
+        }
+
+        if( get_val & TIOCM_CTS ) {
+            // CTS
+            lines->cts = 1;
+        }
+
+        if( get_val & TIOCM_DSR ) {
+            // Data Set Ready
+            lines->dsr = 1;
+        }
+
+        if( get_val & TIOCM_DTR ) {
+            // Data Terminal Ready
+            lines->dtr = 1;
+        }
+
+        if( get_val & TIOCM_RTS ) {
+            // Request To Send
+            lines->rts = 1;
+        }
+
+        if( get_val & TIOCM_RI ) {
+            // Ring Indicator
+            lines->ri = 1;
+        }
+#endif
+    }
+
+    return CSERIAL_OK;
 }
 
 int c_serial_get_available( c_serial_port_t* port,
                             int* available ) {
     CHECK_INVALID_PORT( port );
+#ifdef _WIN32
+    {
+        DWORD comErrors = {0};
+        COMSTAT portStatus = {0};
+        if( !ClearCommError( port->port, &comErrors, &portStatus ) ) {
+            port->last_errnum = GetLastError();
+            LOG_ERROR( "Unable to retrieve bytes available", port );
+            return CSERIAL_ERROR_GENERIC;
+        } else {
+            *available = portStatus.cbInQue;
+        }
+    }
+#else
+    if( ioctl( port->port, FIONREAD, available ) < 0 ) {
+        port->last_errnum = errno;
+        LOG_ERROR( "IOCTL failed when attempting to read bytes available", port );
+        return CSERIAL_ERROR_GENERIC;
+    }
+#endif
+    return CSERIAL_OK;
 }
 
 int c_serial_set_serial_line_change_flags( c_serial_port_t* port,
         int flags ) {
     CHECK_INVALID_PORT( port );
+
+    port->line_flags = flags;
+
+    return CSERIAL_OK;
 }
 
 int c_serial_get_serial_line_change_flags( c_serial_port_t* port ) {
     CHECK_INVALID_PORT( port );
+
+    return port->line_flags;
 }
 
 void c_serial_set_user_data( c_serial_port_t* port, void* data ) {
