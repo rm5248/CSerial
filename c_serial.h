@@ -69,12 +69,14 @@ typedef int c_serial_errnum_t;
 #define CSERIAL_LINE_FLAG_DTR     ( 0x01 << 2 )
 #define CSERIAL_LINE_FLAG_RTS     ( 0x01 << 3 )
 #define CSERIAL_LINE_FLAG_RI      ( 0x01 << 4 )
+#define CSERIAL_LINE_FLAG_CD      ( 0x01 << 5 )
 #define CSERIAL_LINE_FLAG_NONE    0x00
 #define CSERIAL_LINE_FLAG_ALL     ( CSERIAL_LINE_FLAG_CTS | \
                                     CSERIAL_LINE_FLAG_DSR | \
                                     CSERIAL_LINE_FLAG_DTR | \
                                     CSERIAL_LINE_FLAG_RTS | \
-                                    CSERIAL_LINE_FLAG_RI )
+                                    CSERIAL_LINE_FLAG_RI  | \
+                                    CSERIAL_LINE_FLAG_CD )
 
 /**
  * Struct representing the control line state.
@@ -332,7 +334,8 @@ CSERIAL_EXPORT int c_serial_write_data( c_serial_port_t* port,
  *  interested in listening for serial line changes.
  * @param data_length On entry, how long the data is.  On exit, how many bytes
  *  were read. 
- * @param lines The state of the serial lines on read of data.
+ * @param lines The state of the serial lines on read of data.  If waiting for
+ *  the line state to change, cannot be NULL
  * @return CSERIAL_OK on success, error code otherwise
  */
 CSERIAL_EXPORT int c_serial_read_data( c_serial_port_t* port,

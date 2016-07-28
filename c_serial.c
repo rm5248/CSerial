@@ -818,6 +818,7 @@ int c_serial_read_data( c_serial_port_t* port,
     CHECK_INVALID_PORT( port );
 
     if( data == NULL && lines == NULL ) {
+        return CSERIAL_ERROR_INCORRECT_READ_PARAMS;
     }
 
 #ifdef _WIN32
@@ -844,21 +845,16 @@ int c_serial_read_data( c_serial_port_t* port,
 
         selectStatus = select( port->port + 1, &fdset, NULL, NULL, &timeout );
         if( !port->is_open ) {
-            //check to see if the port is closed
+            /* check to see if the port is closed */
             pthread_mutex_unlock( &(port->mutex) );
             return -1;
         }
 
         if( selectStatus < 0 ) {
-            int errval;
-            if( errno == EBADF ) {
-                // EOF
-                errval= 0;
-            } else {
+            if( errno != EBADF ) {
+                port->last_errnum = errno;
                 LOG_ERROR( "Bad value from select", port );
-                errval = -1;
             }
-            port->last_errnum = errno;
             pthread_mutex_unlock( &(port->mutex) );
             return -1;
         }
@@ -875,7 +871,7 @@ int c_serial_read_data( c_serial_port_t* port,
             if( get_val == originalState ) {
                 /* The state of the lines have not changed,
                  * continue on until something changes
-                                 */
+                              */
                 continue;
             }
 
@@ -890,12 +886,56 @@ int c_serial_read_data( c_serial_port_t* port,
                 return -1;
             }
             *data_length = stat;
+        }else if( lines != NULL ){
+            /* Our line state has changed - check to see if we should ignore the
+             * change or if this is a valid reason to stop trying to read
+             */
+             int shouldContinue = 0;
+             if( ( port->line_flags & CSERIAL_LINE_FLAG_CTS ) &&
+                 ( get_val & TIOCM_CTS ) ){
+                 shouldContinue = 1;
+             }
+             if( ( port->line_flags & CSERIAL_LINE_FLAG_CD ) &&
+                 ( get_val & TIOCM_CD ) ){
+                 shouldContinue = 1;
+             }
+             if( ( port->line_flags & CSERIAL_LINE_FLAG_DSR ) &&
+                 ( get_val & TIOCM_DSR ) ){
+                 shouldContinue = 1;
+             }
+             if( ( port->line_flags & CSERIAL_LINE_FLAG_DTR ) &&
+                 ( get_val & TIOCM_DTR ) ){
+                 shouldContinue = 1;
+             }
+             if( ( port->line_flags & CSERIAL_LINE_FLAG_RTS ) &&
+                 ( get_val & TIOCM_RTS ) ){
+                 shouldContinue = 1;
+             }
+             if( ( port->line_flags & CSERIAL_LINE_FLAG_RI ) &&
+                 ( get_val & TIOCM_RI ) ){
+                 shouldContinue = 1;
+             }
+
+
+             if( shouldContinue ){
+                 continue;
+             }
         }
 
         /* We get to this point if we either 1. have data or
          * 2. our state has changed
                  */
         break;
+    }
+
+    if( data != NULL ){
+        int ret = read( port->port, data, *data_length );
+        if( ret < 0 ){
+            port->last_errnum = errno;
+            LOG_ERROR( "Unable to read data", port );
+            return CSERIAL_ERROR_GENERIC;
+        }
+        *data_length = ret;
     }
 
     if( lines != NULL ) {
@@ -942,6 +982,7 @@ int c_serial_read_data( c_serial_port_t* port,
     pthread_mutex_unlock( &(port->mutex) );
 #endif
 
+    return CSERIAL_OK;
 }
 
 c_serial_handle_t c_serial_get_native_handle( c_serial_port_t* port ) {
@@ -1046,12 +1087,10 @@ int c_serial_get_control_lines( c_serial_port_t* port,
         }
 
         if( get_val & MS_CTS_ON ) {
-            // CTS
             lines->cts = 1;
         }
 
         if( get_val & MS_DSR_ON ) {
-            // Data Set Ready
             lines->dsr = 1;
         }
 
@@ -1064,7 +1103,6 @@ int c_serial_get_control_lines( c_serial_port_t* port,
         }
 
         if( get_val & MS_RING_ON ) {
-            // Ring Indicator
             lines->ri = 1;
         }
 #else
@@ -1077,32 +1115,26 @@ int c_serial_get_control_lines( c_serial_port_t* port,
         }
 
         if( get_val & TIOCM_CD ) {
-            // Carrier detect
             lines->cd = 1;
         }
 
         if( get_val & TIOCM_CTS ) {
-            // CTS
             lines->cts = 1;
         }
 
         if( get_val & TIOCM_DSR ) {
-            // Data Set Ready
             lines->dsr = 1;
         }
 
         if( get_val & TIOCM_DTR ) {
-            // Data Terminal Ready
             lines->dtr = 1;
         }
 
         if( get_val & TIOCM_RTS ) {
-            // Request To Send
             lines->rts = 1;
         }
 
         if( get_val & TIOCM_RI ) {
-            // Ring Indicator
             lines->ri = 1;
         }
 #endif
@@ -1243,13 +1275,12 @@ c_serial_errnum_t c_serial_get_last_native_errnum( c_serial_port_t* port ) {
 const char** c_serial_get_serial_ports_list() {
     char** port_names;
     int port_names_size;
-    int x;
-    char message_buffer[ 256 ];
 
     port_names_size = 0;
     port_names = malloc( sizeof( char* ) * 512 );
 #ifdef _WIN32
     {
+        int x;
         /* Brute force, baby! */
         char* port_to_open = malloc( 11 );
         HANDLE* port;
