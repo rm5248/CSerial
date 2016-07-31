@@ -877,15 +877,8 @@ int c_serial_read_data( c_serial_port_t* port,
 
         }
 
-        if( FD_ISSET( port->port, &fdset ) ) {
-            stat = read( port->port, data, *data_length  );
-            if( stat < 0 ) {
-                port->last_errnum = errno;
-                LOG_ERROR( "Unable to read from serial port", port );
-                pthread_mutex_unlock( &(port->mutex) );
-                return -1;
-            }
-            *data_length = stat;
+        if( FD_ISSET( port->port, &fdset ) && data != NULL ) {
+            break;
         }else if( lines != NULL ){
             /* Our line state has changed - check to see if we should ignore the
              * change or if this is a valid reason to stop trying to read

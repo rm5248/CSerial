@@ -113,34 +113,34 @@ enum CSerial_Log_Level{
  */
 enum CSerial_Baud_Rate {
     /** Not supported by Windows */
-    CSERIAL_BAUD_0,
+    CSERIAL_BAUD_0 = 0,
     /** Not supported by Windows */
-    CSERIAL_BAUD_50,
+    CSERIAL_BAUD_50 = 50,
     /** Not supported by Windows */
-    CSERIAL_BAUD_100,
+    CSERIAL_BAUD_100 = 100,
 
-    CSERIAL_BAUD_110,
+    CSERIAL_BAUD_110 = 110,
 
     /** Not supported by Windows */
-    CSERIAL_BAUD_134,
+    CSERIAL_BAUD_134 = 134,
     /** Not supported by Windows */
-    CSERIAL_BAUD_150,
+    CSERIAL_BAUD_150 = 150,
     /** Not supported by Windows */
-    CSERIAL_BAUD_200,
+    CSERIAL_BAUD_200 = 200,
     
-    CSERIAL_BAUD_300,
-    CSERIAL_BAUD_600,
-    CSERIAL_BAUD_1200,
+    CSERIAL_BAUD_300 = 300,
+    CSERIAL_BAUD_600 = 600,
+    CSERIAL_BAUD_1200 = 1200,
 
     /** Not supported by Windows */
-    CSERIAL_BAUD_1800,
+    CSERIAL_BAUD_1800 = 1800,
  
-    CSERIAL_BAUD_2400,
-    CSERIAL_BAUD_4800,
-    CSERIAL_BAUD_9600,
-    CSERIAL_BAUD_19200,
-    CSERIAL_BAUD_38400,
-    CSERIAL_BAUD_115200
+    CSERIAL_BAUD_2400 = 2400,
+    CSERIAL_BAUD_4800 = 4800,
+    CSERIAL_BAUD_9600 = 9600,
+    CSERIAL_BAUD_19200 = 19200,
+    CSERIAL_BAUD_38400 = 38400,
+    CSERIAL_BAUD_115200 = 115200
 }; 
 
 enum CSerial_Data_Bits{
@@ -214,6 +214,7 @@ CSERIAL_EXPORT int c_serial_open( c_serial_port_t* port );
 
 /**
  * Open the port on the system, optionally keeping all settings.
+ * If keepSettings is set to 0, acts the same as c_serial_open
  * 
  * @param port The port to open
  * @param keepSettings 1 if current serial port settings should be kept,
