@@ -47,12 +47,13 @@ INCLUDE_DIRECTORIES( ${C_SERIAL_INCLUDE_DIRECTORIES} )
 # Library information
 #
 ADD_LIBRARY( cserial SHARED ${C_SERIAL_SOURCES} )
+ADD_LIBRARY( cserial_static STATIC ${C_SERIAL_SOURCES} )
 set_target_properties(cserial PROPERTIES VERSION ${CSERIAL_VERSION_STRING} SOVERSION ${CSERIAL_VERSION_MAJOR} )
 
 #
 # Install Information
 #
-SET(install_targets ${install_targets} cserial )
+SET(install_targets ${install_targets} cserial cserial_static )
 INSTALL( TARGETS ${install_targets}
 	RUNTIME DESTINATION bin
 	LIBRARY DESTINATION lib

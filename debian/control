@@ -1,0 +1,23 @@
+Source: cserial
+Priority: optional
+Maintainer: Robert Middleton <robert.middleton@rm5248.com>
+Build-Depends: debhelper (>= 9), cmake
+Standards-Version: 3.9.5
+Section: libs
+Homepage: http://programming.rm5248.com/projects/c-serial/
+Vcs-Git: https://github.com/rm5248/CSerial.git
+Vcs-Browser: https://github.com/rm5248/CSerial
+
+Package: cserial-dev
+Section: libdevel
+Architecture: any
+Depends: cserial0 (= ${binary:Version}), ${misc:Depends}
+Description: Development files for CSerial
+
+Package: cserial0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Cross-platform serial access library
+ CSerial is a cross-platform serial access library.
+ It primarially targets Linux and Windows systems,
+ although it should run on any POSIX-compliant system.
