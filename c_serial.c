@@ -810,9 +810,9 @@ int c_serial_read_data( c_serial_port_t* port,
 #else
     fd_set fdset;
     struct timeval timeout;
-    int originalState;
+    int originalControlState;
     int selectStatus;
-    int get_val;
+    int newControlState;
 #endif
 
     CHECK_INVALID_PORT( port );
@@ -826,7 +826,7 @@ int c_serial_read_data( c_serial_port_t* port,
     pthread_mutex_lock( &(port->mutex) );
 
     /* first get the original state of the serial port lines */
-    if( ioctl( port->port, TIOCMGET, &originalState ) < 0 ) {
+    if( ioctl( port->port, TIOCMGET, &originalControlState ) < 0 ) {
         port->last_errnum = errno;
         LOG_ERROR( "IOCTL failed", port );
         pthread_mutex_unlock( &(port->mutex) );
@@ -861,14 +861,14 @@ int c_serial_read_data( c_serial_port_t* port,
 
         if( selectStatus == 0 ) {
             /* This was a timeout */
-            if( ioctl( port->port, TIOCMGET, &get_val ) < 0 ) {
+            if( ioctl( port->port, TIOCMGET, &newControlState ) < 0 ) {
                 port->last_errnum = errno;
                 LOG_ERROR( "IOCTL call failed", port );
                 pthread_mutex_unlock( &(port->mutex) );
                 return -1;
             }
 
-            if( get_val == originalState ) {
+            if( newControlState == originalControlState ) {
                 /* The state of the lines have not changed,
                  * continue on until something changes
                               */
@@ -879,40 +879,51 @@ int c_serial_read_data( c_serial_port_t* port,
 
         if( FD_ISSET( port->port, &fdset ) && data != NULL ) {
             break;
-        }else if( lines != NULL ){
+        }
+
+        if( lines != NULL ){
             /* Our line state has changed - check to see if we should ignore the
              * change or if this is a valid reason to stop trying to read
              */
-             int shouldContinue = 0;
+             int shouldContinue = 1;
+             int ctsChanged = ( newControlState & TIOCM_CTS ) != ( originalControlState & TIOCM_CTS );
+             int cdChanged = ( newControlState & TIOCM_CD ) != ( originalControlState & TIOCM_CD );
+             int dsrChanged = ( newControlState & TIOCM_DSR ) != ( originalControlState & TIOCM_DSR );
+             int dtrChanged = ( newControlState & TIOCM_DTR ) != ( originalControlState & TIOCM_DTR );
+             int rtsChanged = ( newControlState & TIOCM_RTS ) != ( originalControlState & TIOCM_RTS );
+             int riChanged = ( newControlState & TIOCM_RI ) != ( originalControlState & TIOCM_RI );
+
              if( ( port->line_flags & CSERIAL_LINE_FLAG_CTS ) &&
-                 ( get_val & TIOCM_CTS ) ){
-                 shouldContinue = 1;
+                 ctsChanged ){
+                 shouldContinue = 0;
              }
              if( ( port->line_flags & CSERIAL_LINE_FLAG_CD ) &&
-                 ( get_val & TIOCM_CD ) ){
-                 shouldContinue = 1;
+                 cdChanged ){
+                 shouldContinue = 0;
              }
              if( ( port->line_flags & CSERIAL_LINE_FLAG_DSR ) &&
-                 ( get_val & TIOCM_DSR ) ){
-                 shouldContinue = 1;
+                 dsrChanged ){
+                 shouldContinue = 0;
              }
              if( ( port->line_flags & CSERIAL_LINE_FLAG_DTR ) &&
-                 ( get_val & TIOCM_DTR ) ){
-                 shouldContinue = 1;
+                 dtrChanged ){
+                 shouldContinue = 0;
              }
              if( ( port->line_flags & CSERIAL_LINE_FLAG_RTS ) &&
-                 ( get_val & TIOCM_RTS ) ){
-                 shouldContinue = 1;
+                 rtsChanged ){
+                 shouldContinue = 0;
              }
              if( ( port->line_flags & CSERIAL_LINE_FLAG_RI ) &&
-                 ( get_val & TIOCM_RI ) ){
-                 shouldContinue = 1;
+                 riChanged ){
+                 shouldContinue = 0;
              }
 
 
              if( shouldContinue ){
                  continue;
              }
+
+             break;
         }
 
         /* We get to this point if we either 1. have data or
@@ -921,7 +932,7 @@ int c_serial_read_data( c_serial_port_t* port,
         break;
     }
 
-    if( data != NULL ){
+    if( FD_ISSET( port->port, &fdset ) && data != NULL ) {
         int ret = read( port->port, data, *data_length );
         if( ret < 0 ){
             port->last_errnum = errno;
@@ -929,44 +940,38 @@ int c_serial_read_data( c_serial_port_t* port,
             return CSERIAL_ERROR_GENERIC;
         }
         *data_length = ret;
+    }else{
+        *data_length = 0;
     }
 
     if( lines != NULL ) {
-        /* Now that we have read in the character, let's get the serial port line state. */
-        if( ioctl( port->port, TIOCMGET, &get_val ) < 0 ) {
-            port->last_errnum = errno;
-            LOG_ERROR( "IOCTL call failed", port );
-            pthread_mutex_unlock( &(port->mutex) );
-            return -1;
-        }
-
         memset( lines, 0, sizeof( struct c_serial_control_lines ) );
-        if( get_val & TIOCM_CD ) {
+        if( newControlState & TIOCM_CD ) {
             /* Carrier detect */
             lines->cd = 1;
         }
 
-        if( get_val & TIOCM_CTS ) {
+        if( newControlState & TIOCM_CTS ) {
             /* CTS */
             lines->cts = 1;
         }
 
-        if( get_val & TIOCM_DSR ) {
+        if( newControlState & TIOCM_DSR ) {
             /* Data Set Ready */
             lines->dsr = 1;
         }
 
-        if( get_val & TIOCM_DTR ) {
+        if( newControlState & TIOCM_DTR ) {
             /* Data Terminal Ready */
             lines->dtr = 1;
         }
 
-        if( get_val & TIOCM_RTS ) {
+        if( newControlState & TIOCM_RTS ) {
             /* Request To Send */
             lines->rts = 1;
         }
 
-        if( get_val & TIOCM_RI ) {
+        if( newControlState & TIOCM_RI ) {
             /* Ring Indicator */
             lines->ri = 1;
         }
