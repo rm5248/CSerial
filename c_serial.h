@@ -27,6 +27,12 @@ extern "C" {
     #define CSERIAL_EXPORT __declspec( dllimport )
   #endif /* CSERIAL_LIB */
 
+	/* Static libraries don't use dllexport/dllimport */
+#ifdef CSERIAL_STATIC
+#undef CSERIAL_EXPORT
+#define CSERIAL_EXPORT
+#endif
+
 typedef HANDLE c_serial_handle_t;
 typedef DWORD c_serial_errnum_t;
 
@@ -60,6 +66,8 @@ typedef int c_serial_errnum_t;
 #define CSERIAL_ERROR_ALREADY_OPEN -7
 /** invalid c_serial_port_t, e.g. it is NULL */
 #define CSERIAL_ERROR_INVALID_PORT -8
+/** name of the port to open is too long(6 chars on Windows, 255 on POSIX */
+#define CSERIAL_ERROR_NAME_TOO_LONG -9
 
 /**
  * Serial line flags

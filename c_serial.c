@@ -19,6 +19,7 @@
 #ifdef _WIN32
 
 #include <windows.h>
+#define __func__ __FUNCTION__
 
 #define close( x ) CloseHandle( x )
 #define SPEED_SWITCH(SPD,io) case SPD: io.BaudRate = CBR_##SPD; break;
@@ -185,7 +186,7 @@ static int set_raw_input( c_serial_port_t* port ) {
         timeouts.WriteTotalTimeoutMultiplier = 0;
         timeouts.WriteTotalTimeoutConstant = 0;
         if( SetCommTimeouts( port->port, &timeouts ) == 0 ) {
-            port->last_error = GetLastError();
+            port->last_errnum = GetLastError();
             LOG_ERROR( "Unable to set comm timeouts", port );
             return 0;
         }
@@ -425,6 +426,15 @@ void c_serial_close( c_serial_port_t* port ) {
     }
     port->is_open = 0;
     close( port->port );
+
+#ifdef _WIN32
+	WaitForSingleObject( port->mutex, INFINITE );
+	ReleaseMutex( port->mutex );
+	CloseHandle( port->mutex );
+#else
+	pthread_mutex_lock( &(port->mutex) );
+	pthread_mutex_unlock( &(port->mutex) );
+#endif
 }
 
 int c_serial_open( c_serial_port_t* port ) {
@@ -451,6 +461,13 @@ int c_serial_open_keep_settings( c_serial_port_t* port, int keepSettings ) {
         }
         return CSERIAL_ERROR_GENERIC;
     }
+
+	port->mutex = CreateMutex( NULL, FALSE, NULL );
+	if( port->mutex == NULL ){
+		port->last_errnum = GetLastError();
+		LOG_ERROR( "Unable to create mutex", port );
+		return CSERIAL_ERROR_GENERIC;
+	}
 #else
     port->port = open( port->port_name, O_RDWR );
     if( port->port < 0 ) {
@@ -495,15 +512,21 @@ int c_serial_is_open( c_serial_port_t* port ) {
 
 int c_serial_set_port_name( c_serial_port_t* port,
                             const char* port_name ) {
-    int port_name_len;
+    size_t port_name_len;
     int port_name_offset;
     CHECK_INVALID_PORT( port );
 
     port_name_len = strlen( port_name );
 #ifdef _WIN32
+	if( port_name_len > 6 ){
+		return CSERIAL_ERROR_NAME_TOO_LONG;
+	}
     port_name_offset = 4;
     port_name_len += 5; /* add in \\.\ to the front and have NULL terminator */
 #else
+	if( port_name_len > 255 ){
+		return CSERIAL_ERROR_NAME_TOO_LONG;
+	}
     port_name_offset = 0;
     port_name_len += 1;
 #endif
@@ -630,6 +653,8 @@ enum CSerial_Data_Bits c_serial_get_data_bits( c_serial_port_t* port ) {
         }
 #endif
     }
+
+	return -1;
 }
 
 int c_serial_set_stop_bits( c_serial_port_t* port,
@@ -802,11 +827,14 @@ int c_serial_read_data( c_serial_port_t* port,
                         void* data,
                         int* data_length,
                         c_serial_control_lines_t* lines ) {
-    int stat;
+    
 #ifdef _WIN32
     DWORD ret = 0;
     OVERLAPPED overlap = {0};
     int current_available = 0;
+	int bytesGot;
+	int originalControlState;
+	int gotData = 0;
 #else
     fd_set fdset;
     struct timeval timeout;
@@ -822,6 +850,111 @@ int c_serial_read_data( c_serial_port_t* port,
     }
 
 #ifdef _WIN32
+	WaitForSingleObject( port->mutex, INFINITE );
+	if( GetCommModemStatus( port->port, &originalControlState ) == 0 ){
+		LOG_ERROR( "Unable to get comm modem lines", port );
+		return -1;
+	}
+	do{
+		{
+			DWORD comErrors = { 0 };
+			COMSTAT portStatus = { 0 };
+			if( !ClearCommError( port->port, &comErrors, &portStatus ) ){
+				LOG_ERROR( "Unable to ClearCommError", port );
+				return -1;
+			}
+			else{
+				current_available = portStatus.cbInQue;
+			}
+		}
+
+
+		if( !current_available ){
+			/* If nothing is currently available, wait until we get an event of some kind.
+			 * This could be the serial lines changing state, or it could be some data
+			 * coming into the system.
+			 */
+			overlap.hEvent = CreateEvent( 0, TRUE, 0, 0 );
+			SetCommMask( port->port, EV_RXCHAR | EV_CTS | EV_DSR | EV_RING );
+			WaitCommEvent( port->port, &ret, &overlap );
+			WaitForSingleObject( overlap.hEvent, INFINITE );
+		}
+		else{
+			/* Data is available; set the RXCHAR mask so we try to read from the port */
+			ret = EV_RXCHAR;
+		}
+
+		if( ret == 0 && !port->is_open ){
+			//the port was closed
+			ReleaseMutex( port->mutex );
+			return -1;
+		}
+
+		if( ret & EV_RXCHAR && data != NULL ){
+			if( !ReadFile( port->port, data, *data_length, &bytesGot, &overlap ) ){
+				LOG_ERROR( "Unable to read bytes from port", port );
+				ReleaseMutex( port->mutex );
+				*data_length = 0;
+				return CSERIAL_ERROR_GENERIC;
+			}
+			gotData = 1;
+			*data_length = bytesGot;
+			break;
+		}
+
+		/* Check to see if anything changed that we care about */
+		if( ( ret & EV_CTS ) &&
+			( port->line_flags & CSERIAL_LINE_FLAG_CTS ) ){
+			break;
+		}
+
+		if( ( ret & EV_DSR ) &&
+			( port->line_flags & CSERIAL_LINE_FLAG_DSR ) ){
+			break;
+		}
+
+		if( ( ret & EV_RING ) &&
+			( port->line_flags & CSERIAL_LINE_FLAG_RI ) ){
+			break;
+		}
+		
+	}while( 1 );
+
+	if( lines != NULL ){
+		int modemLines;
+
+		if( GetCommModemStatus( port->port, &modemLines ) == 0 ){
+			LOG_ERROR( "Unable to get comm modem lines", port );
+			return -1;
+		}
+
+		memset( lines, 0, sizeof( c_serial_control_lines_t ) );
+		if( modemLines & MS_CTS_ON ){
+			lines->cts = 1;
+		}
+
+		if( modemLines & MS_DSR_ON ){
+			lines->dsr = 1;
+		}
+
+		if( port->winDTR ){
+			lines->dtr = 1;
+		}
+
+		if( port->winRTS ){
+			lines->rts = 1;
+		}
+
+		if( modemLines & MS_RING_ON ){
+			lines->ri = 1;
+		}
+	}
+
+	if( !gotData ){
+		*data_length = 0;
+	}
+
+	ReleaseMutex( port->mutex );
 #else
     pthread_mutex_lock( &(port->mutex) );
 
@@ -984,7 +1117,13 @@ int c_serial_read_data( c_serial_port_t* port,
 }
 
 c_serial_handle_t c_serial_get_native_handle( c_serial_port_t* port ) {
+#ifdef _WIN32
+	if( port == NULL ){
+		return NULL;
+	}
+#else
     CHECK_INVALID_PORT( port );
+#endif
     return port->port;
 }
 
@@ -1366,5 +1505,5 @@ void c_serial_free_serial_ports_list( const char** port_list ) {
         free( real_port_list[ x ] );
     }
 
-    free( port_list );
+    free( real_port_list );
 }
