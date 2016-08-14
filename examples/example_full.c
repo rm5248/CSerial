@@ -34,6 +34,17 @@ int main( int argc, char** argv ){
      */
     if( argc != 2 ){
         fprintf( stderr, "ERROR: First argument must be serial port\n" );
+		/*
+		 * Since no port was provided, print the available ports
+		 */
+		const char** port_list = c_serial_get_serial_ports_list();
+		x = 0;
+		printf("Available ports:\n");
+		while( port_list[ x ] != NULL ){
+			printf( "%s\n", port_list[ x ] );
+			x++;
+		}
+		c_serial_free_serial_ports_list( port_list );
         return 1;
     }
  

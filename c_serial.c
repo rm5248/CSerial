@@ -1415,6 +1415,7 @@ const char** c_serial_get_serial_ports_list() {
 
     port_names_size = 0;
     port_names = malloc( sizeof( char* ) * 512 );
+	memset( port_names, 0, sizeof( char* ) * 512 );
 #ifdef _WIN32
     {
         int x;

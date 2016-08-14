@@ -33,6 +33,8 @@ extern "C" {
 #define CSERIAL_EXPORT
 #endif
 
+#include <windows.h>
+
 typedef HANDLE c_serial_handle_t;
 typedef DWORD c_serial_errnum_t;
 
