@@ -139,6 +139,8 @@ static c_serial_log_function global_log_function = NULL;
 /*
  * Struct Definitions
  */
+
+/* \cond */
 struct c_serial_port {
     c_serial_handle_t port;
     c_serial_mutex_t mutex;
@@ -158,6 +160,7 @@ struct c_serial_port {
     int is_open;
     int line_flags;
 };
+/* \endcond */
 
 /*
  * Local Methods

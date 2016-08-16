@@ -15,6 +15,10 @@
 #ifndef C_SERIAL_H
 #define C_SERIAL_H
 
+/** \addtogroup serial
+ * @{
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -470,5 +474,7 @@ CSERIAL_EXPORT void c_serial_free_serial_ports_list( const char** port_list );
 #ifdef __cplusplus
 } /* end extern "C" */
 #endif /* __cplusplus */
+
+/** @} */
 
 #endif /* C_SERIAL_H */
