@@ -1,3 +1,10 @@
+cserial (0.1) unstable; urgency=medium
+
+  * Initial release of CSerial
+  * Cross-platform abilities should be working
+
+ -- robert <robert@debian>  Sun, 21 Aug 2016 14:39:30 -0400
+
 cserial (0) unstable; urgency=low
 
   * Initial Release.
