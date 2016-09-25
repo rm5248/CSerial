@@ -888,7 +888,7 @@ int c_serial_read_data( c_serial_port_t* port,
 		}
 
 		if( ret == 0 && !port->is_open ){
-			//the port was closed
+			/* the port was closed */
 			ReleaseMutex( port->mutex );
 			return -1;
 		}
@@ -1502,7 +1502,7 @@ const char** c_serial_get_serial_ports_list() {
 void c_serial_free_serial_ports_list( const char** port_list ) {
     char** real_port_list = (char**)port_list;
     int x;
-    for( x = 0; x < 255; x++ ) {
+    for( x = 0; x < 512; x++ ) {
         if( real_port_list[ x ] == NULL ) {
             break;
         }
