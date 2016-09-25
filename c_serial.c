@@ -145,10 +145,6 @@ struct c_serial_port {
     c_serial_handle_t port;
     c_serial_mutex_t mutex;
     c_serial_errnum_t last_errnum;
-#ifdef _WIN32
-    int winDTR;
-    int winRTS;
-#endif
     char* port_name;
     enum CSerial_Baud_Rate baud_rate;
     enum CSerial_Data_Bits data_bits;
@@ -159,6 +155,12 @@ struct c_serial_port {
     c_serial_log_function log_function;
     int is_open;
     int line_flags;
+#ifdef _WIN32
+    /* Windows-specific variables that we need to keep track of */
+    int winDTR;
+    int winRTS;
+    OVERLAPPED overlap;
+#endif
 };
 /* \endcond */
 
@@ -403,6 +405,8 @@ int c_serial_new( c_serial_port_t** port, c_serial_errnum_t* errnum ) {
         free( new_port );
         return CSERIAL_ERROR_CANT_CREATE;
     }
+    memset( new_port->overlap, 0, sizeof(OVERLAPPED) );
+    new_port->overlap.hEvent = CreateEvent( 0, FALSE, FALSE, 0 );
 #else
     pthread_mutex_init( &(new_port->mutex), NULL );
 #endif /* _WIN32 */
@@ -789,7 +793,6 @@ int c_serial_write_data( c_serial_port_t* port,
                          int* length ) {
 #ifdef _WIN32
     DWORD bytes_written;
-    OVERLAPPED overlap;
 #else
     int bytes_written;
 #endif
@@ -797,9 +800,7 @@ int c_serial_write_data( c_serial_port_t* port,
     CHECK_INVALID_PORT( port );
 
 #ifdef _WIN32
-    memset( &overlap, 0, sizeof( overlap ) );
-    overlap.hEvent = CreateEvent( 0, TRUE, 0, 0 );
-    if( !WriteFile( port->port, data, *length, &bytes_written, &overlap ) ) {
+    if( !WriteFile( port->port, data, *length, &bytes_written, port->overlap ) ) {
         port->last_errnum = GetLastError();
         if( GetLastError() == ERROR_IO_PENDING ) {
             /* Probably not an error, we're just doing this in an async fasion */
@@ -833,7 +834,6 @@ int c_serial_read_data( c_serial_port_t* port,
     
 #ifdef _WIN32
     DWORD ret = 0;
-    OVERLAPPED overlap = {0};
     int current_available = 0;
 	int bytesGot;
 	int originalControlState;
@@ -877,10 +877,9 @@ int c_serial_read_data( c_serial_port_t* port,
 			 * This could be the serial lines changing state, or it could be some data
 			 * coming into the system.
 			 */
-			overlap.hEvent = CreateEvent( 0, TRUE, 0, 0 );
 			SetCommMask( port->port, EV_RXCHAR | EV_CTS | EV_DSR | EV_RING );
-			WaitCommEvent( port->port, &ret, &overlap );
-			WaitForSingleObject( overlap.hEvent, INFINITE );
+			WaitCommEvent( port->port, &ret, &(port->overlap) );
+			WaitForSingleObject( port->overlap.hEvent, INFINITE );
 		}
 		else{
 			/* Data is available; set the RXCHAR mask so we try to read from the port */
@@ -894,7 +893,7 @@ int c_serial_read_data( c_serial_port_t* port,
 		}
 
 		if( ret & EV_RXCHAR && data != NULL ){
-			if( !ReadFile( port->port, data, *data_length, &bytesGot, &overlap ) ){
+			if( !ReadFile( port->port, data, *data_length, &bytesGot, &(port->overlap) ) ){
 				LOG_ERROR( "Unable to read bytes from port", port );
 				ReleaseMutex( port->mutex );
 				*data_length = 0;
@@ -1128,6 +1127,18 @@ c_serial_handle_t c_serial_get_native_handle( c_serial_port_t* port ) {
     CHECK_INVALID_PORT( port );
 #endif
     return port->port;
+}
+
+c_serial_handle_t c_serial_get_poll_handle( c_serial_port_t* port ){
+#ifdef _WIN32
+	if( port == NULL ){
+		return NULL;
+	}
+    return port->overlap.hEvent;
+#else
+    CHECK_INVALID_PORT( port );
+    return port->port;
+#endif
 }
 
 int c_serial_set_control_line( c_serial_port_t* port,

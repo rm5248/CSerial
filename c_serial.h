@@ -360,9 +360,25 @@ CSERIAL_EXPORT int c_serial_read_data( c_serial_port_t* port,
 
 /**
  * Get the native handle(int or HANDLE) that is used by this serial port.
- * This is intended for use with some sort of poll()-like function.
+ * 
+ * Note that on Windows, this will return the actual handle used for 
+ * the ReadFile/WriteFile system calls.  To get the HANDLE for the 
+ * Event, use c_serial_get_poll_handle()
  */
 CSERIAL_EXPORT c_serial_handle_t c_serial_get_native_handle( 
+                                                 c_serial_port_t* port );
+
+/**
+ * Get the native handle used for a poll()-like function.
+ * On POSIX systems, this will return the same as 
+ * c_serial_get_native_handle()
+ *
+ * On Windows, this will return a HANDLE to an created with the 
+ * CreateEvent system call, which can then be used to listen for changes
+ * using a function such as MsgWaitForMultipleObjectsEx or 
+ * WaitForSingleObject.
+ */
+CSERIAL_EXPORT c_serial_handle_t c_serial_get_poll_handle(
                                                  c_serial_port_t* port );
 
 /**
