@@ -15,7 +15,8 @@
 #ifndef C_SERIAL_H
 #define C_SERIAL_H
 
-/** \addtogroup serial
+/**
+ * \addtogroup CSerial Cross-platform serial ports in C
  * @{
  */
 
@@ -74,6 +75,10 @@ typedef int c_serial_errnum_t;
 #define CSERIAL_ERROR_INVALID_PORT -8
 /** name of the port to open is too long(6 chars on Windows, 255 on POSIX */
 #define CSERIAL_ERROR_NAME_TOO_LONG -9
+/** Invalid parameters for flow control. This will be returned if the flow
+ * control and the RS485 handling conflict with each other.
+ */
+#define CSERIAL_ERROR_INVALID_FLOW -10
 
 /**
  * Serial line flags
@@ -179,6 +184,12 @@ enum CSerial_Flow_Control{
     CSERIAL_FLOW_NONE = 0,
     CSERIAL_FLOW_HARDWARE,
     CSERIAL_FLOW_SOFTWARE
+};
+
+enum CSerial_RTS_Handling{
+    CSERIAL_RTS_NONE = 0,
+    CSERIAL_RTS_HARDWARE,
+    CSERIAL_RTS_SOFTWARE
 };
 
 /*
@@ -486,6 +497,26 @@ CSERIAL_EXPORT const char** c_serial_get_serial_ports_list();
  * Free the list of serial ports retrieved with c_serial_get_serial_ports
  */
 CSERIAL_EXPORT void c_serial_free_serial_ports_list( const char** port_list );
+
+/**
+ * Set how RTS should be controlled.  This is generally used for RS-485 
+ * converters.  Note that this logically separate from the flow control, even
+ * if they both use RTS.  That is, if c_serial_set_flow_control() is set with 
+ * HARDWARE flow control, this will override that setting.
+ *
+ * @param handling How to handle setting the RTS control.  HARDWARE indicates 
+ * that we will attempt to use the OS-level way of setting the RTS line.
+ * SOFTWARE indicates that we will set the RTS line on the library side.
+ * NONE turns it off.
+ */
+CSERIAL_EXPORT int c_serial_set_rts_control( c_serial_port_t* port,
+                                        enum CSerial_RTS_Handling handling );
+
+/**
+ * Get the current handling of the RTS line for RS485 handling
+ */
+CSERIAL_EXPORT enum CSerial_RTS_Handling c_serial_get_rts_control( 
+                                                       c_serial_port_t* port );
                     
 #ifdef __cplusplus
 } /* end extern "C" */

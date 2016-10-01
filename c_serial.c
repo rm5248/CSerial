@@ -151,6 +151,7 @@ struct c_serial_port {
     enum CSerial_Stop_Bits stop_bits;
     enum CSerial_Parity parity;
     enum CSerial_Flow_Control flow;
+    enum CSerial_RTS_Handling rs485;
     void* user_data;
     c_serial_log_function log_function;
     int is_open;
@@ -333,11 +334,33 @@ static int set_parity( c_serial_port_t* desc, enum CSerial_Parity parity ) {
 }
 
 /**
+ * Check to make sure that the RTS handling can be set.
+ * If RS485 handling is set, hardware flow control cannot be used 
+ */
+static int check_rts_handling( c_serial_port_t* desc ){
+    if( desc->flow == CSERIAL_FLOW_HARDWARE &&
+        desc->rs485 != CSERIAL_RTS_NONE ){
+        return CSERIAL_ERROR_INVALID_FLOW;
+    }
+
+    return CSERIAL_OK;
+}
+
+/**
+ * Set flow control and the RTS handling
+ *
  * @param flow_control 0 for none, 1 for hardware, 2 for software
  */
 static int set_flow_control( c_serial_port_t* desc,
-                             enum CSerial_Flow_Control flow_control ) {
+                             enum CSerial_Flow_Control flow_control,
+                             enum CSerial_RTS_Handling rts_handling ) {
+    int rc;
     GET_SERIAL_PORT_STRUCT( desc->port, newio );
+
+    rc = check_rts_handling( desc );
+    if( rc != CSERIAL_OK ){
+        return rc;
+    }
 
 #ifdef _WIN32
     if( flow_control == CSERIAL_FLOW_NONE ) {
@@ -370,7 +393,7 @@ static int set_flow_control( c_serial_port_t* desc,
 
     SET_SERIAL_PORT_STRUCT( desc->port, newio );
 
-    return 1;
+    return CSERIAL_OK;
 }
 
 /*
@@ -449,10 +472,15 @@ int c_serial_open( c_serial_port_t* port ) {
 }
 
 int c_serial_open_keep_settings( c_serial_port_t* port, int keepSettings ) {
+    int rc;
     CHECK_INVALID_PORT( port );
 
     if( port->is_open ) return CSERIAL_ERROR_ALREADY_OPEN;
     if( port->port_name == NULL ) return CSERIAL_ERROR_NO_PORT;
+    rc = check_rts_handling( port );
+    if( rc != CSERIAL_OK ){
+        return rc;
+    }
 
 #ifdef _WIN32
     port->port = CreateFile( port->port_name,
@@ -505,7 +533,7 @@ int c_serial_open_keep_settings( c_serial_port_t* port, int keepSettings ) {
         set_data_bits( port, port->data_bits );
         set_stop_bits( port, port->stop_bits );
         set_parity( port, port->parity );
-        set_flow_control( port, port->flow );
+        set_flow_control( port, port->flow, port->rs485 );
     }
 
     return CSERIAL_OK;
@@ -748,14 +776,27 @@ enum CSerial_Parity c_serial_get_parity( c_serial_port_t* port ) {
 
 int c_serial_set_flow_control( c_serial_port_t* port,
                                enum CSerial_Flow_Control control ) {
+    int ok = CSERIAL_OK;
+    enum CSerial_Flow_Control old;
     CHECK_INVALID_PORT( port );
 
+    old = port->flow;
     port->flow = control;
-    if( port->is_open ) {
-        set_flow_control( port, port->flow );
+    
+    ok = check_rts_handling( port );
+    if( ok != CSERIAL_OK ){
+        port->flow = old;
+        LOG_ERROR( "Unable to set flow control: invalid flow "
+                   "control has been specified.  Ignoring.",
+                   port );
+        return ok;
     }
 
-    return CSERIAL_OK;
+    if( port->is_open ) {
+        ok = set_flow_control( port, port->flow, port->rs485 );
+    }
+
+    return ok;
 }
 
 enum CSerial_Flow_Control c_serial_get_flow_control( c_serial_port_t* port ) {
@@ -1521,4 +1562,35 @@ void c_serial_free_serial_ports_list( const char** port_list ) {
     }
 
     free( real_port_list );
+}
+
+int c_serial_set_rts_control( c_serial_port_t* port,
+                              enum CSerial_RTS_Handling handling ){
+    int ok = CSERIAL_OK;
+    enum CSerial_RTS_Handling old;
+    CHECK_INVALID_PORT( port );
+
+    old = port->rs485;
+    port->rs485 = handling;
+    
+    ok = check_rts_handling( port );
+    if( ok != CSERIAL_OK ){
+        port->rs485 = old;
+        LOG_ERROR( "Unable to set RTS handling: invalid flow "
+                   "control has been specified.  Ignoring.",
+                   port );
+        return ok;
+    }
+
+    if( port->is_open ) {
+        ok = set_flow_control( port, port->flow, port->rs485 );
+    }
+
+    return ok;
+}
+
+enum CSerial_RTS_Handling c_serial_get_rts_control( c_serial_port_t* port ){
+    CHECK_INVALID_PORT( port );
+
+    return port->rs485;
 }
