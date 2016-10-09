@@ -141,19 +141,20 @@ typedef pthread_mutex_t c_serial_mutex_t;
   }
 
 #define SET_RTS_IF_REQUIRED( port ) \
-  if( desc->rs485_is_software ) { \
+  if( port->rs485_is_software ) { \
       c_serial_control_lines_t lines; \
       c_serial_get_control_lines( port, &lines ); \
       lines.rts = 1;\
-      c_serial_set_control_lines( port, &lines );\
+      c_serial_set_control_line( port, &lines, 0 );\
   }
 
 #define CLEAR_RTS_IF_REQUIRED( port )\
-  if( desc->rs485_is_software ) { \
+  if( port->rs485_is_software ) { \
       c_serial_control_lines_t lines; \
       c_serial_get_control_lines( port, &lines ); \
       lines.rts = 0;\
-      c_serial_set_control_lines( port, &lines );\
+      c_serial_flush( port );\
+      c_serial_set_control_line( port, &lines, 0 );\
   }
 
 static c_serial_log_function global_log_function = NULL;
@@ -964,6 +965,8 @@ int c_serial_write_data( c_serial_port_t* port,
 
     CHECK_INVALID_PORT( port );
 
+    SET_RTS_IF_REQUIRED( port );
+
 #ifdef _WIN32
     if( !WriteFile( port->port, data, *length, &bytes_written, port->overlap ) ) {
         port->last_errnum = GetLastError();
@@ -988,6 +991,8 @@ int c_serial_write_data( c_serial_port_t* port,
     }
 #endif
     *length = bytes_written;
+
+    CLEAR_RTS_IF_REQUIRED( port );
 
     return CSERIAL_OK;
 }
@@ -1719,3 +1724,10 @@ enum CSerial_RTS_Handling c_serial_get_rts_control( c_serial_port_t* port ){
     return port->rs485;
 }
 
+int c_serial_flush( c_serial_port_t* port ){
+    CHECK_INVALID_PORT( port );
+
+    
+
+    return CSERIAL_OK;
+}

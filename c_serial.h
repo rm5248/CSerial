@@ -534,6 +534,11 @@ CSERIAL_EXPORT int c_serial_set_rts_control( c_serial_port_t* port,
 CSERIAL_EXPORT enum CSerial_RTS_Handling c_serial_get_rts_control( 
                                                        c_serial_port_t* port );
 
+/**
+ * Flush all data.
+ */
+CSERIAL_EXPORT int c_serial_flush( c_serial_port_t* port );
+
 #ifdef __cplusplus
 } /* end extern "C" */
 #endif /* __cplusplus */
