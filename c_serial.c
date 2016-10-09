@@ -13,6 +13,8 @@
    See the License for the specific language governing permissions and
 */
 
+#include "config.h"
+
 /*
  * Platform-specific definitions
  */
@@ -48,6 +50,10 @@ typedef HANDLE c_serial_mutex_t;
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <poll.h>
+
+#ifdef HAVE_LINUX_SERIAL
+#include <linux/serial.h>
+#endif
 
 #ifndef ENOMEDIUM
 #define ENOMEDIUM ENODEV
@@ -134,6 +140,22 @@ typedef pthread_mutex_t c_serial_mutex_t;
     return CSERIAL_ERROR_INVALID_PORT;\
   }
 
+#define SET_RTS_IF_REQUIRED( port ) \
+  if( desc->rs485_is_software ) { \
+      c_serial_control_lines_t lines; \
+      c_serial_get_control_lines( port, &lines ); \
+      lines.rts = 1;\
+      c_serial_set_control_lines( port, &lines );\
+  }
+
+#define CLEAR_RTS_IF_REQUIRED( port )\
+  if( desc->rs485_is_software ) { \
+      c_serial_control_lines_t lines; \
+      c_serial_get_control_lines( port, &lines ); \
+      lines.rts = 0;\
+      c_serial_set_control_lines( port, &lines );\
+  }
+
 static c_serial_log_function global_log_function = NULL;
 
 /*
@@ -152,6 +174,7 @@ struct c_serial_port {
     enum CSerial_Parity parity;
     enum CSerial_Flow_Control flow;
     enum CSerial_RTS_Handling rs485;
+    int rs485_is_software;
     void* user_data;
     c_serial_log_function log_function;
     int is_open;
@@ -168,6 +191,73 @@ struct c_serial_port {
 /*
  * Local Methods
  */
+
+static int clear_rts( c_serial_port_t* desc ){
+#ifdef _WIN32
+    GET_SERIAL_PORT_STRUCT( desc, newio );
+    newio.fRtsControl = RTS_CONTROL_TOGGLE;
+    SET_SERIAL_PORT_STRUCT( desc, newio );
+#elif defined( HAVE_LINUX_SERIAL )
+    struct serial_rs485 rs485conf;
+    if( ioctl( desc->port, TIOCGRS485, &rs485conf ) < 0 ){
+        return CSERIAL_ERROR_GENERIC;
+    }
+    
+    if( rs485conf.flags & SER_RS485_ENABLED ){
+        rs485conf.flags &= ~(SER_RS485_ENABLED);
+
+        if( ioctl( desc->port, TIOCSRS485, &rs485conf ) < 0 ){
+            return CSERIAL_RTS_TYPE_NOT_AVAILABLE;
+        }
+    }
+#endif /* _WIN32 */
+    return CSERIAL_OK;
+}
+
+static int set_rts_hw( c_serial_port_t* desc ){
+#ifdef _WIN32
+    GET_SERIAL_PORT_STRUCT( desc, newio );
+    newio.fRtsControl = ;
+    SET_SERIAL_PORT_STRUCT( desc, newio );
+#elif defined( HAVE_LINUX_SERIAL )
+    struct serial_rs485 rs485conf;
+    if( ioctl( desc->port, TIOCGRS485, &rs485conf ) < 0 ){
+        return CSERIAL_ERROR_GENERIC;
+    }
+    
+    rs485conf.flags |= SER_RS485_ENABLED;
+
+    if( ioctl( desc->port, TIOCSRS485, &rs485conf ) < 0 ){
+        return CSERIAL_RTS_TYPE_NOT_AVAILABLE;
+    }
+#endif /* _WIN32 */
+    return CSERIAL_OK;
+}
+
+/* try to set the RTS control at a driver level */
+static int set_rts_settings( c_serial_port_t* desc ){
+    int retval;
+
+    if( desc->rs485 == CSERIAL_RTS_NONE ){
+       desc->rs485_is_software = 0;
+       retval = clear_rts( desc );
+    }else if( desc->rs485 == CSERIAL_RTS_HARDWARE ){
+       desc->rs485_is_software = 0;
+       retval = set_rts_hw( desc );
+    }else if( desc->rs485 == CSERIAL_RTS_SOFTWARE ){
+       desc->rs485_is_software = 1;
+    }else if( desc->rs485 == CSERIAL_RTS_BEST_AVAILABLE ){
+       desc->rs485_is_software = 0;
+       retval = set_rts_hw( desc );
+       if( retval != CSERIAL_OK ){
+           desc->rs485_is_software = 1;
+           retval = CSERIAL_OK;
+       }
+    }
+
+    return retval;
+}
+
 static int set_raw_input( c_serial_port_t* port ) {
     GET_SERIAL_PORT_STRUCT( port->port, newio );
 
@@ -350,11 +440,13 @@ static int check_rts_handling( c_serial_port_t* desc ){
  * Set flow control and the RTS handling
  *
  * @param flow_control 0 for none, 1 for hardware, 2 for software
+ * @param rts_handling RTS handling according to the enum
  */
 static int set_flow_control( c_serial_port_t* desc,
                              enum CSerial_Flow_Control flow_control,
                              enum CSerial_RTS_Handling rts_handling ) {
     int rc;
+    int status = CSERIAL_OK;
     GET_SERIAL_PORT_STRUCT( desc->port, newio );
 
     rc = check_rts_handling( desc );
@@ -389,11 +481,13 @@ static int set_flow_control( c_serial_port_t* desc,
     } else if( flow_control == CSERIAL_FLOW_SOFTWARE ) {
         newio.c_iflag |= ( IXON | IXOFF | IXANY );
     }
-#endif
+#endif /* _WIN32 */
 
     SET_SERIAL_PORT_STRUCT( desc->port, newio );
 
-    return CSERIAL_OK;
+    status = set_rts_settings( desc );
+
+    return status;
 }
 
 /*
@@ -419,6 +513,7 @@ int c_serial_new( c_serial_port_t** port, c_serial_errnum_t* errnum ) {
     new_port->stop_bits = CSERIAL_STOP_BITS_1;
     new_port->parity = CSERIAL_PARITY_NONE;
     new_port->flow = CSERIAL_FLOW_NONE;
+    new_port->rs485_is_software = 0;
 
 #ifdef _WIN32
     new_port->mutex = CreateMutex( NULL, FALSE, NULL );
@@ -473,6 +568,7 @@ int c_serial_open( c_serial_port_t* port ) {
 
 int c_serial_open_keep_settings( c_serial_port_t* port, int keepSettings ) {
     int rc;
+    int retval = CSERIAL_OK;
     CHECK_INVALID_PORT( port );
 
     if( port->is_open ) return CSERIAL_ERROR_ALREADY_OPEN;
@@ -527,16 +623,44 @@ int c_serial_open_keep_settings( c_serial_port_t* port, int keepSettings ) {
 
     port->is_open = 1;
 
+    /* Set all of our settings.  If there are any erorrs, close
+     * the port and bail out
+     */
     if( !keepSettings ) {
-        set_raw_input( port );
-        set_baud_rate( port, port->baud_rate );
-        set_data_bits( port, port->data_bits );
-        set_stop_bits( port, port->stop_bits );
-        set_parity( port, port->parity );
-        set_flow_control( port, port->flow, port->rs485 );
+        retval = set_raw_input( port );
+        if( retval ){ 
+            c_serial_close( port );
+            goto out;
+        }
+        retval = set_baud_rate( port, port->baud_rate );
+        if( retval ){ 
+            c_serial_close( port );
+            goto out;
+        }
+        retval = set_data_bits( port, port->data_bits );
+        if( retval ){ 
+            c_serial_close( port );
+            goto out;
+        }
+        retval = set_stop_bits( port, port->stop_bits );
+        if( retval ){ 
+            c_serial_close( port );
+            goto out;
+        }
+        retval = set_parity( port, port->parity );
+        if( retval ){ 
+            c_serial_close( port );
+            goto out;
+        }
+        retval = set_flow_control( port, port->flow, port->rs485 );
+        if( retval ){ 
+            c_serial_close( port );
+            goto out;
+        }
     }
 
-    return CSERIAL_OK;
+out:
+    return retval;
 }
 
 int c_serial_is_open( c_serial_port_t* port ) {
@@ -1594,3 +1718,4 @@ enum CSerial_RTS_Handling c_serial_get_rts_control( c_serial_port_t* port ){
 
     return port->rs485;
 }
+

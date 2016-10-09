@@ -16,7 +16,7 @@
 #define C_SERIAL_H
 
 /**
- * \addtogroup CSerial Cross-platform serial ports in C
+ * \addtogroup CSerial
  * @{
  */
 
@@ -76,9 +76,12 @@ typedef int c_serial_errnum_t;
 /** name of the port to open is too long(6 chars on Windows, 255 on POSIX */
 #define CSERIAL_ERROR_NAME_TOO_LONG -9
 /** Invalid parameters for flow control. This will be returned if the flow
- * control and the RS485 handling conflict with each other.
+ * control and the RTS handling conflict with each other.
  */
 #define CSERIAL_ERROR_INVALID_FLOW -10
+/** Returned if the specified RTS control type is not available
+ */
+#define CSERIAL_RTS_TYPE_NOT_AVAILABLE -11
 
 /**
  * Serial line flags
@@ -187,9 +190,18 @@ enum CSerial_Flow_Control{
 };
 
 enum CSerial_RTS_Handling{
+    /** Do not handle the RTS line */
     CSERIAL_RTS_NONE = 0,
+    /** Use hardware/driver level RTS handling.   */
     CSERIAL_RTS_HARDWARE,
-    CSERIAL_RTS_SOFTWARE
+    /** Use software-level RTS handling.  This will cause any calls 
+     * to c_serial_write_data to block
+     */
+    CSERIAL_RTS_SOFTWARE,
+    /** Use the best available RTS handling.
+     * CSERIAL_RTS_HARDWARE will be used if it is available
+     */
+    CSERIAL_RTS_BEST_AVAILABLE
 };
 
 /*
@@ -504,6 +516,10 @@ CSERIAL_EXPORT void c_serial_free_serial_ports_list( const char** port_list );
  * if they both use RTS.  That is, if c_serial_set_flow_control() is set with 
  * HARDWARE flow control, this will override that setting.
  *
+ * Important note regarding setting the RTS control: If the port is not open,
+ * this function may return CSERIAL_OK if the setting is valid, and upon
+ * opening the port CSERIAL_RTS_TYPE_NOT_AVAILABLE may be returned.
+ *
  * @param handling How to handle setting the RTS control.  HARDWARE indicates 
  * that we will attempt to use the OS-level way of setting the RTS line.
  * SOFTWARE indicates that we will set the RTS line on the library side.
@@ -517,7 +533,7 @@ CSERIAL_EXPORT int c_serial_set_rts_control( c_serial_port_t* port,
  */
 CSERIAL_EXPORT enum CSerial_RTS_Handling c_serial_get_rts_control( 
                                                        c_serial_port_t* port );
-                    
+
 #ifdef __cplusplus
 } /* end extern "C" */
 #endif /* __cplusplus */
