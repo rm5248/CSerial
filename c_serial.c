@@ -1727,7 +1727,17 @@ enum CSerial_RTS_Handling c_serial_get_rts_control( c_serial_port_t* port ){
 int c_serial_flush( c_serial_port_t* port ){
     CHECK_INVALID_PORT( port );
 
-    
+#ifdef _WIN32
+    if( FileFlushBuffers( port->port ) == 0 ){
+        port->last_errnum = GetLastError();
+        return CSERIAL_ERROR_GENERIC;
+    }
+#else
+    if( tcflush( port->port, TCOFLUSH ) < 0 ){
+        port->last_errnum = errno;
+        return CSERIAL_ERROR_GENERIC;
+    }
+#endif /* _WIN32 */
 
     return CSERIAL_OK;
 }
