@@ -87,8 +87,19 @@ This corresponds to `errno` on POSIX and `GetLastError` on Windows.
 with the port.
 * `c_serial_get_available` - Get the number of bytes to read.
 * `c_serial_get_native_handle` - Get the native handle(int on POSIX, HANDLE on 
-Windows) for use with a `poll()`-like function.
+Windows) for raw I/O access
+* `c_serial_get_poll_handle` - Get the handle used to poll for changes on a 
+port.  Useful for use with a `poll()`-like function.
 
+### RTS Handling
+
+The library also supports toggling of the RTS line when transmitting data 
+over the serial port.  This is generally used for RS-485 transmitting.  This 
+can be set to several different settings(see the enum CSerial_RTS_Handling 
+for more details).  If set to HARDWARE, this will attempt to use the built-in 
+kernel level functions for controlling the RTS line(using `struct serial_rs485` 
+on Linux, or setting `fRtsControl` on Windows).  Setting it to SOFTWARE will 
+cause the library to manually toggle the RTS line when sending data.
 
 ## Bugs
 
