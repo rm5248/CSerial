@@ -218,7 +218,7 @@ static int clear_rts( c_serial_port_t* desc ){
 static int set_rts_hw( c_serial_port_t* desc ){
 #ifdef _WIN32
     GET_SERIAL_PORT_STRUCT( desc, newio );
-    newio.fRtsControl = ;
+    newio.fRtsControl = RTS_CONTROL_TOGGLE;
     SET_SERIAL_PORT_STRUCT( desc, newio );
 #elif defined( HAVE_LINUX_SERIAL )
     struct serial_rs485 rs485conf;
@@ -524,7 +524,7 @@ int c_serial_new( c_serial_port_t** port, c_serial_errnum_t* errnum ) {
         free( new_port );
         return CSERIAL_ERROR_CANT_CREATE;
     }
-    memset( new_port->overlap, 0, sizeof(OVERLAPPED) );
+    memset( &(new_port->overlap), 0, sizeof(OVERLAPPED) );
     new_port->overlap.hEvent = CreateEvent( 0, FALSE, FALSE, 0 );
 #else
     pthread_mutex_init( &(new_port->mutex), NULL );
@@ -968,11 +968,11 @@ int c_serial_write_data( c_serial_port_t* port,
     SET_RTS_IF_REQUIRED( port );
 
 #ifdef _WIN32
-    if( !WriteFile( port->port, data, *length, &bytes_written, port->overlap ) ) {
+    if( !WriteFile( port->port, data, *length, &bytes_written, &(port->overlap) ) ) {
         port->last_errnum = GetLastError();
         if( GetLastError() == ERROR_IO_PENDING ) {
             /* Probably not an error, we're just doing this in an async fasion */
-            if( WaitForSingleObject( overlap.hEvent, INFINITE ) == WAIT_FAILED ) {
+            if( WaitForSingleObject( port->overlap.hEvent, INFINITE ) == WAIT_FAILED ) {
                 port->last_errnum = GetLastError();
                 LOG_ERROR( "Unable to write data out: OVERLAPPED operation failed", port );
                 return CSERIAL_ERROR_GENERIC;
@@ -1728,7 +1728,7 @@ int c_serial_flush( c_serial_port_t* port ){
     CHECK_INVALID_PORT( port );
 
 #ifdef _WIN32
-    if( FileFlushBuffers( port->port ) == 0 ){
+    if( FlushFileBuffers( port->port ) == 0 ){
         port->last_errnum = GetLastError();
         return CSERIAL_ERROR_GENERIC;
     }
