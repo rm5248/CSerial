@@ -1,3 +1,9 @@
+cserial (0.2) unstable; urgency=medium
+
+  * Bumped version for release
+
+ -- robert <robert@robert-macbook>  Sun, 04 Dec 2016 16:37:53 -0500
+
 cserial (0.1) unstable; urgency=medium
 
   * Initial release of CSerial
