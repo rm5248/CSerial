@@ -27,15 +27,17 @@
 #define SPEED_SWITCH(SPD,io) case SPD: io.BaudRate = CBR_##SPD; break;
 #define GET_SPEED_SWITCH(SPD,io) case CBR_##SPD: baud_return = SPD;
 
-#define GET_SERIAL_PORT_STRUCT( port, io_name ) DCB io_name = {0};\
+#define GET_SERIAL_PORT_STRUCT( cserial_port, io_name ) DCB io_name = {0};\
        io_name.DCBlength = sizeof( io_name ); \
-       if (!GetCommState( port, &io_name ) ) { \
-         printf("bad get comm\n");\
+       if (!GetCommState( cserial_port->port, &io_name ) ) { \
+	     cserial_port->last_errnum = GetLastError();\
+         printf("bad get comm line %d\n", __LINE__);\
          return -1;\
        }
-#define SET_SERIAL_PORT_STRUCT( port, io_name ) 	if( !SetCommState( port, &io_name ) ){\
+#define SET_SERIAL_PORT_STRUCT( cserial_port, io_name ) 	if( !SetCommState( cserial_port->port, &io_name ) ){\
+		cserial_port->last_errnum = GetLastError();\
         printf("bad set comm\n");\
-        return 0;\
+        return -1;\
     }
 
 typedef HANDLE c_serial_mutex_t;
@@ -67,11 +69,11 @@ typedef HANDLE c_serial_mutex_t;
 
 #define SPEED_SWITCH(SPD,io) case SPD: cfsetospeed( &io, B##SPD ); cfsetispeed( &io, B##SPD ); break;
 #define GET_SPEED_SWITCH(SPD,io) case B##SPD: baud_return = SPD;
-#define GET_SERIAL_PORT_STRUCT( port, io_name )	struct termios io_name; \
-        if( tcgetattr( port, &io_name ) < 0 ){ \
+#define GET_SERIAL_PORT_STRUCT( cserial_port, io_name )	struct termios io_name; \
+        if( tcgetattr( cserial_port->port, &io_name ) < 0 ){ \
             return -1; \
         }
-#define SET_SERIAL_PORT_STRUCT( port, io_name ) 	if( tcsetattr( port, TCSANOW, &io_name ) < 0 ){\
+#define SET_SERIAL_PORT_STRUCT( cserial_port, io_name ) 	if( tcsetattr( cserial_port->port, TCSANOW, &io_name ) < 0 ){\
         return -1;\
     }
 
@@ -260,7 +262,7 @@ static int set_rts_settings( c_serial_port_t* desc ){
 }
 
 static int set_raw_input( c_serial_port_t* port ) {
-    GET_SERIAL_PORT_STRUCT( port->port, newio );
+    GET_SERIAL_PORT_STRUCT( port, newio );
 
 #ifdef _WIN32
     newio.fBinary = TRUE;
@@ -298,13 +300,13 @@ static int set_raw_input( c_serial_port_t* port ) {
     newio.c_cc[VMIN] = 1;
 #endif
 
-    SET_SERIAL_PORT_STRUCT( port->port, newio );
+    SET_SERIAL_PORT_STRUCT( port, newio );
 
-    return 1;
+    return CSERIAL_OK;
 }
 
 static int set_baud_rate( c_serial_port_t* desc, int baud_rate ) {
-    GET_SERIAL_PORT_STRUCT( desc->port, newio );
+    GET_SERIAL_PORT_STRUCT( desc, newio );
 
     switch( baud_rate ) {
 #ifndef _WIN32
@@ -335,9 +337,9 @@ static int set_baud_rate( c_serial_port_t* desc, int baud_rate ) {
         SPEED_SWITCH(115200,newio);
     }
 
-    SET_SERIAL_PORT_STRUCT( desc->port, newio );
+    SET_SERIAL_PORT_STRUCT( desc, newio );
 
-    return 1;
+    return CSERIAL_OK;
 }
 
 /**
@@ -345,7 +347,7 @@ static int set_baud_rate( c_serial_port_t* desc, int baud_rate ) {
  */
 static int set_data_bits( c_serial_port_t* desc,
                           enum CSerial_Data_Bits data_bits ) {
-    GET_SERIAL_PORT_STRUCT( desc->port, newio );
+    GET_SERIAL_PORT_STRUCT( desc, newio );
 
 #ifdef _WIN32
     newio.ByteSize = data_bits;
@@ -362,9 +364,9 @@ static int set_data_bits( c_serial_port_t* desc,
     }
 #endif
 
-    SET_SERIAL_PORT_STRUCT( desc->port, newio );
+    SET_SERIAL_PORT_STRUCT( desc, newio );
 
-    return 1;
+    return CSERIAL_OK;
 }
 
 /**
@@ -372,7 +374,7 @@ static int set_data_bits( c_serial_port_t* desc,
  */
 static int set_stop_bits( c_serial_port_t* desc,
                           enum CSerial_Stop_Bits stop_bits ) {
-    GET_SERIAL_PORT_STRUCT( desc->port, newio );
+    GET_SERIAL_PORT_STRUCT( desc, newio );
 
 #ifdef _WIN32
     if( stop_bits == CSERIAL_STOP_BITS_1 ) {
@@ -388,16 +390,16 @@ static int set_stop_bits( c_serial_port_t* desc,
     }
 #endif
 
-    SET_SERIAL_PORT_STRUCT( desc->port, newio );
+    SET_SERIAL_PORT_STRUCT( desc, newio );
 
-    return 1;
+    return CSERIAL_OK;
 }
 
 /**
  * @param parity 0 for no parity, 1 for odd parity, 2 for even parity
  */
 static int set_parity( c_serial_port_t* desc, enum CSerial_Parity parity ) {
-    GET_SERIAL_PORT_STRUCT( desc->port, newio );
+    GET_SERIAL_PORT_STRUCT( desc, newio );
 
 #ifdef _WIN32
     if( parity == CSERIAL_PARITY_NONE ) {
@@ -419,9 +421,9 @@ static int set_parity( c_serial_port_t* desc, enum CSerial_Parity parity ) {
     }
 #endif
 
-    SET_SERIAL_PORT_STRUCT( desc->port, newio );
+    SET_SERIAL_PORT_STRUCT( desc, newio );
 
-    return 1;
+    return CSERIAL_OK;
 }
 
 /**
@@ -448,7 +450,7 @@ static int set_flow_control( c_serial_port_t* desc,
                              enum CSerial_RTS_Handling rts_handling ) {
     int rc;
     int status = CSERIAL_OK;
-    GET_SERIAL_PORT_STRUCT( desc->port, newio );
+    GET_SERIAL_PORT_STRUCT( desc, newio );
 
     rc = check_rts_handling( desc );
     if( rc != CSERIAL_OK ){
@@ -484,7 +486,7 @@ static int set_flow_control( c_serial_port_t* desc,
     }
 #endif /* _WIN32 */
 
-    SET_SERIAL_PORT_STRUCT( desc->port, newio );
+    SET_SERIAL_PORT_STRUCT( desc, newio );
 
     status = set_rts_settings( desc );
 
@@ -717,7 +719,7 @@ int c_serial_set_baud_rate( c_serial_port_t* port,
 
     port->baud_rate = baud;
     if( port->is_open ) {
-        set_baud_rate( port, port->baud_rate );
+        return set_baud_rate( port, port->baud_rate );
     }
 
     return CSERIAL_OK;
@@ -733,7 +735,7 @@ enum CSerial_Baud_Rate c_serial_get_baud_rate( c_serial_port_t* port ) {
     }
 
     {
-        GET_SERIAL_PORT_STRUCT( port->port, newio );
+        GET_SERIAL_PORT_STRUCT( port, newio );
 #ifdef _WIN32
         GetCommState( port->port, &newio );
         switch( newio.BaudRate ) {
@@ -776,7 +778,7 @@ int c_serial_set_data_bits( c_serial_port_t* port,
 
     port->data_bits = bits;
     if( port->is_open ) {
-        set_data_bits( port, port->data_bits );
+        return set_data_bits( port, port->data_bits );
     }
 
     return CSERIAL_OK;
@@ -786,7 +788,7 @@ enum CSerial_Data_Bits c_serial_get_data_bits( c_serial_port_t* port ) {
     CHECK_INVALID_PORT( port );
 
     {
-        GET_SERIAL_PORT_STRUCT( port->port, newio );
+        GET_SERIAL_PORT_STRUCT( port, newio );
 
 #ifdef _WIN32
         switch( newio.ByteSize ) {
@@ -823,7 +825,7 @@ int c_serial_set_stop_bits( c_serial_port_t* port,
 
     port->stop_bits = bits;
     if( port->is_open ) {
-        set_stop_bits( port, port->stop_bits );
+        return set_stop_bits( port, port->stop_bits );
     }
 
     return CSERIAL_OK;
@@ -833,7 +835,7 @@ enum CSerial_Stop_Bits c_serial_get_stop_btis( c_serial_port_t* port ) {
     CHECK_INVALID_PORT( port );
 
     {
-        GET_SERIAL_PORT_STRUCT( port->port, newio );
+        GET_SERIAL_PORT_STRUCT( port, newio );
 #ifdef _WIN32
         port->stop_bits = newio.StopBits;
         if( newio.StopBits == 1 ) {
@@ -861,7 +863,7 @@ int c_serial_set_parity( c_serial_port_t* port,
 
     port->parity = parity;
     if( port->is_open ) {
-        set_parity( port, port->parity );
+        return set_parity( port, port->parity );
     }
 
     return CSERIAL_OK;
@@ -871,7 +873,7 @@ enum CSerial_Parity c_serial_get_parity( c_serial_port_t* port ) {
     CHECK_INVALID_PORT( port );
 
     {
-        GET_SERIAL_PORT_STRUCT( port->port, newio );
+        GET_SERIAL_PORT_STRUCT( port, newio );
 #ifdef _WIN32
         if( newio.Parity == NOPARITY ) {
             return 0;
@@ -927,7 +929,7 @@ int c_serial_set_flow_control( c_serial_port_t* port,
 enum CSerial_Flow_Control c_serial_get_flow_control( c_serial_port_t* port ) {
     CHECK_INVALID_PORT( port );
     {
-        GET_SERIAL_PORT_STRUCT( port->port, newio );
+        GET_SERIAL_PORT_STRUCT( port, newio );
 #ifdef _WIN32
         if( newio.fOutX == TRUE && newio.fInX == TRUE ) {
             return 2;
