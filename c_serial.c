@@ -203,6 +203,13 @@ static int clear_rts( c_serial_port_t* desc ){
 #elif defined( HAVE_LINUX_SERIAL )
     struct serial_rs485 rs485conf;
     if( ioctl( desc->port, TIOCGRS485, &rs485conf ) < 0 ){
+	if( errno == ENOTTY ){
+		/* Inappropriate ioctl for device. */
+		/* This serial converter does not support RS485.  */
+		/* This error can occur with an FTDI RS485 cable. */
+		return CSERIAL_OK;
+	}
+	desc->last_errnum = errno;
         return CSERIAL_ERROR_GENERIC;
     }
     
@@ -210,6 +217,7 @@ static int clear_rts( c_serial_port_t* desc ){
         rs485conf.flags &= ~(SER_RS485_ENABLED);
 
         if( ioctl( desc->port, TIOCSRS485, &rs485conf ) < 0 ){
+	    desc->last_errnum = errno;
             return CSERIAL_RTS_TYPE_NOT_AVAILABLE;
         }
     }
@@ -500,7 +508,7 @@ static int set_flow_control( c_serial_port_t* desc,
 int c_serial_new( c_serial_port_t** port, c_serial_errnum_t* errnum ) {
     c_serial_port_t* new_port;
 
-    if( *port == NULL ) {
+    if( port == NULL ) {
         return CSERIAL_ERROR_CANT_CREATE;
     }
 
