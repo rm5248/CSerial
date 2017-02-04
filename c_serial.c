@@ -968,7 +968,7 @@ int c_serial_write_data( c_serial_port_t* port,
                          void* data,
                          int* length ) {
 #ifdef _WIN32
-    DWORD bytes_written;
+	DWORD bytes_written;
 #else
     int bytes_written;
 #endif
@@ -978,7 +978,7 @@ int c_serial_write_data( c_serial_port_t* port,
     SET_RTS_IF_REQUIRED( port );
 
 #ifdef _WIN32
-    if( !WriteFile( port->port, data, *length, &bytes_written, &(port->overlap) ) ) {
+    if( !WriteFile( port->port, data, *length, NULL, &(port->overlap) ) ) {
         port->last_errnum = GetLastError();
         if( GetLastError() == ERROR_IO_PENDING ) {
             /* Probably not an error, we're just doing this in an async fasion */
@@ -992,6 +992,11 @@ int c_serial_write_data( c_serial_port_t* port,
             return CSERIAL_ERROR_GENERIC;
         }
     }
+
+	if( GetOverlappedResult( port->port, &(port->overlap), &bytes_written, 1 ) == 0 ){
+		LOG_ERROR( "Unabel to write data", port );
+		return CSERIAL_ERROR_GENERIC;
+	}
 #else
     bytes_written = write( port->port, data, *length );
     if( bytes_written < 0 ) {
@@ -1000,7 +1005,7 @@ int c_serial_write_data( c_serial_port_t* port,
         return CSERIAL_ERROR_GENERIC;
     }
 #endif
-    *length = bytes_written;
+	*length = bytes_written;
 
     CLEAR_RTS_IF_REQUIRED( port );
 
