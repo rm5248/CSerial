@@ -116,3 +116,4 @@ IF( WIN32 )
 ENDIF( WIN32 )
 
 file(WRITE "foo.txt" "what what in de butt" )
+file(WRITE "foo space.txt" "egad!" )
