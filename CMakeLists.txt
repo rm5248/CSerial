@@ -114,3 +114,5 @@ IF( WIN32 )
 	ADD_DEFINITIONS( "-DCSERIAL_LIB" )
 	target_compile_definitions( cserial_static PUBLIC CSERIAL_STATIC )
 ENDIF( WIN32 )
+
+file(WRITE "foo.txt" "what what in de butt" )
