@@ -9,6 +9,9 @@ for( int i = 0; i < axisArchitecture.size(); i++ ){
     tasks["${axisNode[0]}/${axisArchitecture[i]}"] = {
         node(axisNode[0]){
             ws{
+		stage( "checkout" ){
+			checkout scm
+		}
                 stage( "clean" ){
                     cleanWs()
                 }
