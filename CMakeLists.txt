@@ -16,6 +16,7 @@ PROJECT(cserial)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 INCLUDE(CheckIncludeFiles)
+INCLUDE(GNUInstallDirs)
 
 #
 # CMake variables
@@ -61,11 +62,20 @@ set_target_properties(cserial PROPERTIES VERSION ${CSERIAL_VERSION_STRING} SOVER
 # Install Information
 #
 SET(install_targets ${install_targets} cserial cserial_static )
-INSTALL( TARGETS ${install_targets}
-	RUNTIME DESTINATION bin
-	LIBRARY DESTINATION lib
-	ARCHIVE DESTINATION lib )
-INSTALL( FILES ${C_SERIAL_HEADERS} DESTINATION include/cserial )
+IF( UNIX )
+    INSTALL( TARGETS ${install_targets}
+             RUNTIME DESTINATION bin
+             LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+             ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" )
+    INSTALL( FILES ${C_SERIAL_HEADERS} DESTINATION include/cserial )
+ENDIF( UNIX )
+IF( WIN32 )
+    INSTALL( TARGETS ${install_targets}
+             RUNTIME DESTINATION bin
+             LIBRARY DESTINATION lib
+             ARCHIVE DESTINATION lib )
+    INSTALL( FILES ${C_SERIAL_HEADERS} DESTINATION include/cserial )
+ENDIF( WIN32 )
 
 IF( UNIX )
     #
@@ -114,6 +124,3 @@ IF( WIN32 )
 	ADD_DEFINITIONS( "-DCSERIAL_LIB" )
 	target_compile_definitions( cserial_static PUBLIC CSERIAL_STATIC )
 ENDIF( WIN32 )
-
-file(WRITE "foo.txt" "what what in de butt" )
-file(WRITE "foo space.txt" "egad!" )
