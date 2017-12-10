@@ -247,7 +247,7 @@ static int set_rts_hw( c_serial_port_t* desc ){
 
 /* try to set the RTS control at a driver level */
 static int set_rts_settings( c_serial_port_t* desc ){
-    int retval;
+    int retval = CSERIAL_ERROR_GENERIC;
 
     if( desc->rs485 == CSERIAL_RTS_NONE ){
        desc->rs485_is_software = 0;
