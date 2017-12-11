@@ -14,7 +14,21 @@ serial port implementation.
 CSerial is designed to be fully POSIX-compliant, however if it is not please
 open an issue on GitHub.  See the 'Bugs' section for more details on this.
 
-## Build / Install
+## Continuous Integration
+[![Build Status](http://jenkins.rm5248.com/buildStatus/icon?job=CSerial)](
+http://jenkins.rm5248.com/job/CSerial)
+
+Find builds on [Jenkins!](http://jenkins.rm5248.com/job/CSerial/)
+
+## Install(Debian-based systems)
+
+There is an APT server setup that provides CSerial that you can find
+[here](http://apt.rm5248.com/).  Note that because the 'nightly' repo 
+contains packages for both amd64 and armhf, you may need to specify
+the exact version to install, as otherwise it may attempt to install 
+one from an incorrect arch.
+
+## Build / Install from source
 
 Building is done using CMake.  On Linux, this should be done like the 
 following:
