@@ -15,10 +15,10 @@ CSerial is designed to be fully POSIX-compliant, however if it is not please
 open an issue on GitHub.  See the 'Bugs' section for more details on this.
 
 ## Continuous Integration
-[![Build Status](http://jenkins.rm5248.com/buildStatus/icon?job=CSerial)](
-http://jenkins.rm5248.com/job/CSerial)
+[![Build Status](https://jenkins.rm5248.com/buildStatus/icon?job=CSerial-buildall
+)](https://jenkins.rm5248.com/job/CSerial-buildall)
 
-Find builds on [Jenkins!](http://jenkins.rm5248.com/job/CSerial/)
+Find builds on [Jenkins!](https://jenkins.rm5248.com/view/CSerial/)
 
 ## Install(Debian-based systems)
 
@@ -59,7 +59,7 @@ and can only be passed as a pointer.  Use the `c_serial_new` function.
 be opened.  It will be something like `/dev/ttyS0` on Linux systems, and 
 `COM1` on Windows systems.  Use the `c_serial_set_port_name` function.
 3. Set the serial port parameters.  By default, the port will be opened at 
-`9600-8-N-1`.  Any other settings 
+`9600-8-N-1`.  Any other settings can be set with the appropriate setters.
   * To set the baud rate, use `c_serial_set_baud_rate`
   * To set the number of data bits, use `c_serial_set_data_bits`
   * To set the number of stop bits, use `c_cserial_set_stop_bits`
@@ -103,7 +103,10 @@ with the port.
 * `c_serial_get_native_handle` - Get the native handle(int on POSIX, HANDLE on 
 Windows) for raw I/O access
 * `c_serial_get_poll_handle` - Get the handle used to poll for changes on a 
-port.  Useful for use with a `poll()`-like function.
+port.  Useful for use with a `poll()`-like function.  On POSIX systems, this
+returns the same as `c_serial_get_native_handle`.  On Windows, this returns
+a `HANDLE` corresponding to an event created with `CreateEvent` on the 
+`OVERLAPPED` struct associated with the serial port.
 
 ### RTS Handling
 
