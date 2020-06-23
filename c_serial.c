@@ -25,7 +25,7 @@
 
 #define close( x ) CloseHandle( x )
 #define SPEED_SWITCH(SPD,io) case SPD: io.BaudRate = CBR_##SPD; break;
-#define GET_SPEED_SWITCH(SPD,io) case CBR_##SPD: baud_return = SPD;
+#define GET_SPEED_SWITCH(SPD,io) case CBR_##SPD: baud_return = SPD; break;
 
 #define GET_SERIAL_PORT_STRUCT( cserial_port, io_name ) DCB io_name = {0};\
        io_name.DCBlength = sizeof( io_name ); \
@@ -68,7 +68,7 @@ typedef HANDLE c_serial_mutex_t;
 #endif
 
 #define SPEED_SWITCH(SPD,io) case SPD: cfsetospeed( &io, B##SPD ); cfsetispeed( &io, B##SPD ); break;
-#define GET_SPEED_SWITCH(SPD,io) case B##SPD: baud_return = SPD;
+#define GET_SPEED_SWITCH(SPD,io) case B##SPD: baud_return = SPD; break;
 #define GET_SERIAL_PORT_STRUCT( cserial_port, io_name )	struct termios io_name; \
         if( tcgetattr( cserial_port->port, &io_name ) < 0 ){ \
             return -1; \
