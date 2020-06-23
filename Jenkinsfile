@@ -1,29 +1,8 @@
-#!/usr/bin/env groovy
+@Library('rm5248-jenkins-scripts')
 
-def axisArchitecture = ["amd64", "armhf"]
-def axisNode = ["master"]
-def tasks = [:]
+def distros = ["buster"]
+def arches = ["amd64"]
 
-for( int i = 0; i < axisArchitecture.size(); i++ ){
-    def arch = axisArchitecture[i];
-    tasks["${axisNode[0]}/${axisArchitecture[i]}"] = {
-        node(axisNode[0]){
-	stage( "checkout" ){
-		checkout scm
-   	}
-            ws{
-                stage( "clean" ){
-                    cleanWs()
-                }
-                stage("build-${arch}"){
-                    debianPbuilder architecture:"${arch}"
-                }
-            }
-        }
-    }
-}
-
-stage('build'){
-    parallel tasks
-}
-
+buildDebPkg( "amd64", "buster" )
+buildDebPkg( "i386", "buster" )
+buildDebPkg( "armhf", "buster" )
