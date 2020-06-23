@@ -839,7 +839,7 @@ int c_serial_set_stop_bits( c_serial_port_t* port,
     return CSERIAL_OK;
 }
 
-enum CSerial_Stop_Bits c_serial_get_stop_btis( c_serial_port_t* port ) {
+enum CSerial_Stop_Bits c_serial_get_stop_bits( c_serial_port_t* port ) {
     CHECK_INVALID_PORT( port );
 
     {
