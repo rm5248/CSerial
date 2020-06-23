@@ -49,7 +49,7 @@ int main( int argc, char** argv ){
     }
  
     /*
-     * Set the global log function.  This can also be set per-port 
+     * Set the global log function.
      * We will use a simple log function that prints to stderr
      */
     c_serial_set_global_log_function( c_serial_stderr_log_function );

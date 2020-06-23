@@ -15,6 +15,8 @@
 #ifndef C_SERIAL_H
 #define C_SERIAL_H
 
+#include "simplelogger_defs.h"
+
 /**
  * \addtogroup CSerial
  * @{
@@ -119,17 +121,6 @@ struct c_serial_control_lines {
 };
 typedef struct c_serial_control_lines c_serial_control_lines_t;
 
-/** 
- * Enum for logging callback.
- */
-enum CSerial_Log_Level{
-    CSERIAL_TRACE,
-    CSERIAL_DEBUG,
-    CSERIAL_INFO,
-    CSERIAL_WARNING,
-    CSERIAL_ERROR
-};   
-
 /**
  * Enum for baud rate
  */
@@ -208,16 +199,6 @@ enum CSerial_RTS_Handling{
  * Opaque type for interfacing with a serial port.
  */
 typedef struct c_serial_port c_serial_port_t;
-
-/**
- * Logging function pointer type
- */
-typedef void (*c_serial_log_function)( enum CSerial_Log_Level logLevel,
-                                       const char* logMessage,
-                                       const char* fileName,
-                                       int lineNumber,
-                                       const char* functionName,
-                                       c_serial_port_t* port );
 
 /**
  * Cerate a new C Serial object with default settings.
@@ -464,29 +445,19 @@ CSERIAL_EXPORT void* c_serial_get_user_data( c_serial_port_t* port );
 CSERIAL_EXPORT const char* c_serial_get_error_string( int errnum );
 
 /**
- * Set the log function for a specific serial port
- */
-CSERIAL_EXPORT int c_serial_set_log_function( c_serial_port_t* port,
-                                              c_serial_log_function func );
-
-/**
- * Set the global log function.  This function is used if the log function
- * for a specified port has not been set.
+ * Set the global log function that will get all of the 
  */
 CSERIAL_EXPORT int c_serial_set_global_log_function( 
-                                                 c_serial_log_function func );
+                                                 simplelogger_log_function func );
 
 /**
  * A simple implementation of a log function which outputs log information
  * to stderr.
  */
-CSERIAL_EXPORT void c_serial_stderr_log_function( 
-                                       enum CSerial_Log_Level logLevel,
-                                       const char* logMessage,
-                                       const char* fileName,
-                                       int lineNumber,
-                                       const char* functionName,
-                                       c_serial_port_t* port );
+CSERIAL_EXPORT void c_serial_stderr_log_function(const char* logger_name, 
+                                                 const struct SL_LogLocation* location,
+                                                 const enum SL_LogLevel level,
+                                                 const char* log_string );
 
 /**
  * Get the last error number associated with this port.  This corresponds
