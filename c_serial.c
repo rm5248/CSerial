@@ -300,6 +300,7 @@ static int set_baud_rate( c_serial_port_t* desc, int baud_rate ) {
         SPEED_SWITCH(9600,newio);
         SPEED_SWITCH(19200,newio);
         SPEED_SWITCH(38400,newio);
+        SPEED_SWITCH(57600,newio);
         SPEED_SWITCH(115200,newio);
     }
 
@@ -728,6 +729,7 @@ enum CSerial_Baud_Rate c_serial_get_baud_rate( c_serial_port_t* port ) {
             GET_SPEED_SWITCH( 9600, newio );
             GET_SPEED_SWITCH( 19200, newio );
             GET_SPEED_SWITCH( 38400, newio );
+            GET_SPEED_SWITCH( 57600, newio );
             GET_SPEED_SWITCH( 115200, newio );
         default:
             baud_return = 0;
