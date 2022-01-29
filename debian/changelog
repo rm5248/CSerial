@@ -1,8 +1,8 @@
-cserial (0.3) UNRELEASED; urgency=medium
+cserial (0.3) unstable; urgency=medium
 
   * Bumped version after release
 
- -- robert <robert@robert-macbook>  Sun, 04 Dec 2016 16:43:08 -0500
+ -- robert <robert@debian>  Sat, 29 Jan 2022 12:28:54 -0500
 
 cserial (0.2) unstable; urgency=medium
 
