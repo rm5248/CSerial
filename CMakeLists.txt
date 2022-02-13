@@ -99,7 +99,7 @@ IF( UNIX )
         "${CMAKE_CURRENT_SOURCE_DIR}/cserial.pc.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc"
     )
-    INSTALL( FILES "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.pc"
+    INSTALL( FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc"
              DESTINATION lib/pkgconfig)
 ENDIF( UNIX )
 
