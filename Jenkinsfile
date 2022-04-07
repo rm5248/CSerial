@@ -1,8 +1,29 @@
-@Library('rm5248-jenkins-scripts')
+pipeline {
+	agent any
 
-def distros = ["buster"]
-def arches = ["amd64"]
+	stages {
+		stage('do tha build'){
+			steps{
+				cleanWs()
 
-buildDebPkg( "amd64", "buster" )
-buildDebPkg( "i386", "buster" )
-buildDebPkg( "armhf", "buster" )
+				checkout scm
+
+				debianPbuilder additionalBuildResults: '', 
+					architecture: '', 
+					components: '', 
+					distribution: 'buster', 
+					keyring: '', 
+					mirrorSite: 'http://deb.debian.org/debian', 
+					pristineTarName: ''
+
+				fingerprint 'binaries/*.deb'
+			}
+		}
+
+		stage('packagecloud'){
+			steps {
+			}
+		}
+	}
+
+}
