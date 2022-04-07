@@ -40,6 +40,7 @@ pipeline {
 				rtBuildInfo (
     // Optional - Maximum builds to keep in Artifactory.
     maxBuilds: 1,
+    dleteBuildArtifacts: true,
 				)
 
 			rtPublishBuildInfo (
