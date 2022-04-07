@@ -20,8 +20,18 @@ pipeline {
 			}
 		}
 
-		stage('packagecloud'){
+		stage('jfrog'){
 			steps {
+				rtUpload (
+    serverId: 'rm5248-jfrog',
+    spec: '''{
+          "files": [
+            {
+              "pattern": "binaries*/*",
+              "target": "test-repo-debian-local/cserial/"
+            }
+         ]
+    }''',
 			}
 		}
 	}
