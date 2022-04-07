@@ -31,7 +31,7 @@ pipeline {
               "target": "test-repo-debian-local/cserial/"
             }
          ]
-    }''',
+    }''' )
 			}
 		}
 	}
