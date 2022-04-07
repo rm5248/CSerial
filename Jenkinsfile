@@ -6,7 +6,10 @@ pipeline {
 			steps{
 				cleanWs()
 
-				checkout scm
+				fileOperations([folderCreateOperation('source')])
+				dir('source'){
+					checkout scm
+				}
 
 				debianPbuilder additionalBuildResults: '', 
 					architecture: '', 
