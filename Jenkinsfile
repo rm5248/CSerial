@@ -31,7 +31,8 @@ pipeline {
           "files": [
             {
               "pattern": "binaries*/*",
-              "target": "test-repo-debian-local/cserial/"
+              "target": "test-repo-debian-local/pool/cserial/",
+              "props":"deb.distribution=buster;deb.component=main;deb.architecture=amd64"
             }
          ]
     }''' )
