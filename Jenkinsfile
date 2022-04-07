@@ -25,15 +25,6 @@ pipeline {
 
 		stage('jfrog'){
 			steps {
-				rtBuildInfo (
-    // Optional - Maximum builds to keep in Artifactory.
-    maxBuilds: 1,
-				)
-
-			rtPublishBuildInfo (
-    serverId: 'rm5248-jfrog'
-			)
-
 				rtUpload (
     serverId: 'rm5248-jfrog',
     spec: '''{
@@ -45,6 +36,16 @@ pipeline {
             }
          ]
     }''' )
+
+				rtBuildInfo (
+    // Optional - Maximum builds to keep in Artifactory.
+    maxBuilds: 1,
+				)
+
+			rtPublishBuildInfo (
+    serverId: 'rm5248-jfrog'
+			)
+
 			}
 		}
 	}
