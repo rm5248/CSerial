@@ -1,8 +1,3 @@
-@Library('rm5248-jenkins-scripts')
+@Library('rm5248-jenkins-scripts@2.0') _
 
-def distros = ["buster"]
-def arches = ["amd64"]
-
-buildDebPkg( "amd64", "buster" )
-buildDebPkg( "i386", "buster" )
-buildDebPkg( "armhf", "buster" )
+buildStandardDebPkg()
