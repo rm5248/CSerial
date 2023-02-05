@@ -123,5 +123,17 @@ cause the library to manually toggle the RTS line when sending data.
 Questions?  Bugs?  Open an [issue](https://github.com/rm5248/CSerial/issues)
  in GitHub and I will take a look at it.
 
+## CMake support
+
+In order to use CSerial in a CMake based project, you can use `find_package`
+to properly find and link with it.  For example:
+
+```
+find_package(cserial)
+
+add_executable(my-program my-program.c)
+target_link_libraries(my-program PRIVATE cserial)
+```
+
 ## License
 Licensed under Apache 2.0

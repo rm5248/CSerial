@@ -1,5 +1,5 @@
 #
-#   Copyright 2016 rm5248
+#   Copyright 2016-2023 Robert Middleton
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -11,9 +11,9 @@
 #   distributed under the License is distributed on an "AS IS" BASIS,
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
-PROJECT(cserial)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.3)
 
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+PROJECT(cserial VERSION 0.3.0)
 
 INCLUDE(CheckIncludeFiles)
 INCLUDE(GNUInstallDirs)
@@ -32,12 +32,8 @@ SET( install_targets )
 #
 # library version
 #
-SET(CSERIAL_VERSION_MAJOR 0)
-SET(CSERIAL_VERSION_MINOR 3)
-SET(CSERIAL_VERSION_PATCH 0)
-SET(CSERIAL_VERSION_STRING ${CSERIAL_VERSION_MAJOR}.${CSERIAL_VERSION_MINOR}.${CSERIAL_VERSION_PATCH})
 
-ADD_DEFINITIONS( "-DCSERIAL_VERSION=${CSERIAL_VERSION_STRING}" )
+ADD_DEFINITIONS( "-DCSERIAL_VERSION=${cserial_VERSION}" )
 
 #
 # Sources for the library
@@ -56,15 +52,21 @@ CONFIGURE_FILE(config.h.in config.h)
 # Library information
 #
 ADD_LIBRARY( cserial SHARED ${C_SERIAL_SOURCES} )
-ADD_LIBRARY( cserial_static STATIC ${C_SERIAL_SOURCES} )
-set_target_properties(cserial PROPERTIES VERSION ${CSERIAL_VERSION_STRING} SOVERSION ${CSERIAL_VERSION_MAJOR} )
+set_target_properties(cserial PROPERTIES VERSION ${cserial_VERSION} SOVERSION ${cserial_VERSION_MAJOR} )
+
+option(CSERIAL_ENABLE_STATIC "Enable static library for CSerial" OFF)
+if(CSERIAL_ENABLE_STATIC)
+	ADD_LIBRARY( cserial_static STATIC ${C_SERIAL_SOURCES} )
+	SET(install_targets ${install_targets} cserial_static )
+endif()
 
 #
 # Install Information
 #
-SET(install_targets ${install_targets} cserial cserial_static )
+SET(install_targets ${install_targets} cserial )
 IF( UNIX )
     INSTALL( TARGETS ${install_targets}
+             EXPORT cserialTargets
              RUNTIME DESTINATION bin
              LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
              ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" )
@@ -72,6 +74,7 @@ IF( UNIX )
 ENDIF( UNIX )
 IF( WIN32 )
     INSTALL( TARGETS ${install_targets}
+             EXPORT cserialTargets
              RUNTIME DESTINATION bin
              LIBRARY DESTINATION lib
              ARCHIVE DESTINATION lib )
@@ -125,3 +128,20 @@ IF( WIN32 )
 	ADD_DEFINITIONS( "-DCSERIAL_LIB" )
 	target_compile_definitions( cserial_static PUBLIC CSERIAL_STATIC )
 ENDIF( WIN32 )
+
+#
+# Support for find_package
+#
+install(EXPORT cserialTargets
+  FILE        cserialConfig.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cserial
+)
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cserialConfigVersion.cmake"
+  VERSION       ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+install(FILES   "${CMAKE_CURRENT_BINARY_DIR}/cserialConfigVersion.cmake"
+  DESTINATION   ${CMAKE_INSTALL_LIBDIR}/cmake/cserial
+)
