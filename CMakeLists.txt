@@ -126,7 +126,9 @@ endif()
 #
 IF( WIN32 )
 	ADD_DEFINITIONS( "-DCSERIAL_LIB" )
-	target_compile_definitions( cserial_static PUBLIC CSERIAL_STATIC )
+	if(CSERIAL_ENABLE_STATIC)
+		target_compile_definitions( cserial_static PUBLIC CSERIAL_STATIC )
+	endif(CSERIAL_ENABLE_STATIC)
 ENDIF( WIN32 )
 
 #
